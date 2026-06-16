@@ -1,8 +1,13 @@
 # 🔍 CCPA 2023 Compliance Classifier: Dark Pattern Detector
 
-[![Streamlit App](https://static.streamlit.io/badge-gradient.svg)](https://dark-patterns.streamlit.app/)
-[![GitHub Profile](https://img.shields.io/badge/GitHub-goyashek-orange?style=flat&logo=github)](https://github.com/goyashek)
-[![CCPA-2023 Enforceable](https://img.shields.io/badge/CCPA--2023-Enforceable-red?style=flat)](https://github.com/goyashek)
+<p align="left">
+  <a href="https://dark-patterns.streamlit.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Streamlit-Live%20Demo-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Live Demo">
+  </a>
+  <a href="https://github.com/goyashek" target="_blank">
+    <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Profile">
+  </a>
+</p>
 
 **Route 1: Classical NLP + Core ML Pipeline & Auditing Dashboard**
 
@@ -19,6 +24,13 @@ You can interact with the live auditing tool here:
 ## 👨‍💻 Author & Credits
 - **Created By**: [Abhishek Goyal](https://github.com/goyashek)
 - **GitHub**: [github.com/goyashek](https://github.com/goyashek)
+
+---
+
+## 📊 Data Sources
+The dataset powering this classifier is compiled from two primary sources:
+1. **Academic Baseline**: Raw e-commerce dark-pattern texts sourced from the **Yada et al. 2022** corpus.
+2. **Indian Context Dataset**: Specifically gathered to reflect local compliance requirements, sourced from Kaggle: **[Insert Kaggle Dataset Link Here]**.
 
 ---
 
