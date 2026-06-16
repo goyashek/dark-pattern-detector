@@ -1,175 +1,146 @@
-# 🔍 Dark Pattern Detector — CCPA 2023 Compliance Classifier
+# 🔍 CCPA 2023 Compliance Classifier: Dark Pattern Detector
 
-**Route 1: Classical NLP + Core ML.** A tool that reads a UI text string (button label,
-popup, checkout message, cookie banner) and classifies it into one of **14 categories** —
-the **13 dark-pattern types made illegal by India's CCPA guidelines (Nov 2023)** plus
-*Not a Dark Pattern* — and flags whether it is a likely legal violation.
+[![Streamlit App](https://static.streamlit.io/badge-gradient.svg)](https://dark-patterns.streamlit.app/)
+[![GitHub Profile](https://img.shields.io/badge/GitHub-goyashek-orange?style=flat&logo=github)](https://github.com/goyashek)
+[![CCPA-2023 Enforceable](https://img.shields.io/badge/CCPA--2023-Enforceable-red?style=flat)](https://github.com/goyashek)
 
-It uses interpretable, hand-engineered NLP features + TF-IDF feeding classical
-scikit-learn / XGBoost models, and ships with a Streamlit compliance dashboard.
+**Route 1: Classical NLP + Core ML Pipeline & Auditing Dashboard**
 
----
-
-## 🇮🇳 Why this matters (Indian context)
-
-On **30 November 2023**, India's **Central Consumer Protection Authority (CCPA)** notified
-guidelines naming **13 dark patterns** as illegal under the Consumer Protection Act, 2019.
-These are now enforceable violations, and regulators cannot manually review the millions of
-UI strings on Indian e-commerce, SaaS and food-delivery apps. This project turns that legal
-list into an automated, explainable classifier.
+A compliance auditing tool that reads website/application UI text copy (e.g., urgency flags, pre-checked opt-ins, confirm-shaming prompts) and classifies it into one of **14 categories**—India's **13 illegal dark-pattern classes** established by the **Central Consumer Protection Authority (CCPA) in November 2023** plus a *Not a Dark Pattern* (safe/benign) class.
 
 ---
 
-## 📈 Improvement over the Yada et al. 2022 baseline
-
-This project builds on **Yada et al. 2022** (the e-commerce dark-pattern dataset with a
-BERT/RoBERTa baseline) and extends it for the Indian regulatory setting:
-
-| | Yada et al. 2022 (baseline) | This project |
-|---|---|---|
-| Label space | Binary + 7 academic (Mathur) categories | **14 classes = India's 13 CCPA legal types + benign** |
-| Framing | Academic taxonomy | **Mapped to enforceable CCPA-2023 clauses** |
-| Class coverage | Several CCPA types absent, heavy class skew | **All 14 covered** via manually-collected examples + balancing |
-| Modeling | Transformer baseline (black box) | **Interpretable features** (you can see *why* a string was flagged) |
-| Output | Dark / not-dark | **CCPA category + clause + violation flag + feature triggers** |
-| Deliverable | Dataset + baseline code | **Reproducible pipeline + deployable Streamlit compliance app** |
-
-The remapping of the 7 academic categories onto the 13 CCPA legal categories is the small
-research contribution of this work.
+## 🚀 Live Demo & Deployment
+You can interact with the live auditing tool here:  
+👉 **[https://dark-patterns.streamlit.app/](https://dark-patterns.streamlit.app/)**
 
 ---
 
-## 🏆 Results (held-out test set, tuned XGBoost)
-
-| Metric | Value |
-|---|---|
-| **Multi-class macro-F1** (1,085 unseen rows) | **0.969** |
-| **Multi-class accuracy** | **0.971** |
-| **Binary "violation?" macro-F1** | **0.97** |
-| Dataset size (after global de-duplication) | **5,422 unique rows** |
-| Classes | 14 |
-
-5-fold cross-validation on the training split (macro-F1):
-
-| Model | CV macro-F1 |
-|---|---|
-| Random Forest | 0.968 |
-| XGBoost (tuned) | 0.964 → **0.969** after Optuna |
-| Linear SVC | 0.958 |
-| Logistic Regression | 0.937 |
-| Complement NB | 0.797 |
-
-> Scores are reported on a test set that shares **zero strings** with the training set, so
-> the numbers reflect real generalisation, not memorisation.
+## 👨‍💻 Author & Credits
+- **Created By**: [Abhishek Goyal](https://github.com/goyashek)
+- **GitHub**: [github.com/goyashek](https://github.com/goyashek)
 
 ---
 
-## 🗺️ Pipeline & flow
+## 🇮🇳 Regulatory Context & Motivation
 
-```mermaid
-flowchart LR
-    A[Yada-2022 raw text] --> C[Remap 7 academic -> 13 CCPA types]
-    B[Manually-collected examples<br/>for missing CCPA classes] --> D[Merge]
-    C --> D
-    D --> E[Global de-duplicate<br/>leakage fix]
-    E --> F[Clean + lemmatize]
-    F --> G[22 interpretable features + TF-IDF]
-    G --> H[ColumnTransformer]
-    H --> I[SMOTE inside CV folds]
-    I --> J[Compare 5 models]
-    J --> K[Optuna-tuned XGBoost]
-    K --> L[Held-out evaluation]
-    L --> M[Export joblib -> Streamlit app]
-```
+On **30 November 2023**, India's CCPA notified new guidelines declaring **13 categories of dark patterns** illegal under the Consumer Protection Act, 2019. E-commerce platforms, booking engines, and SaaS providers operating in India face regulatory penalties for violating these guidelines. 
 
-- **Notebook 1** (`01_data_nlp_eda.ipynb`): data assembly, NLP preprocessing, feature
-  engineering and EDA.
-- **Notebook 2** (`02_model_tuning_export.ipynb`): model comparison, tuning, evaluation
-  and model export.
+Given the millions of UI copy changes pushed daily across the web, manual compliance auditing is impossible. This project bridges the gap between **legal requirements** and **automated machine learning auditing** by building a classifier that maps arbitrary UI text onto enforceable legal clauses.
 
 ---
 
-## 🧠 Advanced techniques used
+## 🔬 Bridging Academic Taxonomy and Legal Reality
 
-- **Hybrid feature space** — TF-IDF (bigrams, `min_df=2`, sublinear TF) combined with 22
-  hand-engineered features through a scikit-learn `ColumnTransformer`.
-- **RobustScaler + Yeo-Johnson** power transform on numeric features (resistant to the
-  long-tailed length/keyword distributions).
-- **SMOTE inside each CV fold** (via `imblearn.Pipeline`) so oversampling never leaks
-  information from the validation fold.
-- **Macro-F1 as the headline metric**, not accuracy — it weights all 14 classes equally
-  and forces the model to learn the rarer patterns.
-- **Optuna Bayesian hyper-parameter tuning** of XGBoost, optimised on **cross-validated**
-  macro-F1 of the training split only; the held-out test set is scored exactly once.
-- **Global de-duplication before splitting** — guarantees no string appears in both train
-  and test (prevents data leakage).
-- **Shared feature module** (`src/features.py`) imported by both the pipeline and the app,
-  so there is no train/serve skew.
+This project takes the raw dataset from the academic baseline **Yada et al. 2022** (which classifies dark patterns into Mathur's academic taxonomy) and maps it onto the 2023 CCPA legal clauses.
+
+### Comparative Analysis: Baseline vs. This Project
+
+| Metric/Feature | Yada et al. 2022 (Baseline) | This Project |
+| :--- | :--- | :--- |
+| **Label Space** | Binary + 7 Academic Taxonomy Classes | **14 Classes** (13 CCPA Legal Classes + Benign) |
+| **Practical Context** | Academic Research | **Regulatory Compliance & Auditing** |
+| **Class Coverage** | Missing legal categories, high class skew | **All 13 CCPA classes represented** using custom examples |
+| **Explainability** | Black-box Transformer predictions | **Interpretable NLP features** + active lexical badge triggers |
+| **Inference Layer** | Raw uncalibrated model outputs | **Precision-gate thresholding + Toned-down UI confidence** |
 
 ---
 
-## 📂 Structure
+## 🛠️ Advanced Techniques & Rationale (Why We Did Them)
+
+To build a robust classifier suitable for real-world auditing, we implemented several advanced machine learning techniques. Below is the rationale for each engineering decision:
+
+### 1. Global De-duplication Prior to Splitting
+* **Why**: To prevent data leakage. UI copy contains frequent duplicate strings (e.g., standard cancel buttons or cookie consent alerts). Splitting the dataset before de-duplicating would cause identical text to populate both the training and test folds. This would inflate validation accuracy, leading to a model that has memorized specific strings rather than generalizing to new ones.
+
+### 2. SMOTE Oversampling Inside Cross-Validation Folds
+* **Why**: To fix severe class imbalance without validation bias. Rare classes like *Subscription Trap* have very few samples. Using SMOTE on the entire dataset prior to splitting leaks synthetic samples generated from validation data into the training fold. Wrapping the preprocessing in an `imblearn.Pipeline` ensures that SMOTE is executed strictly on the training partition of each fold during cross-validation.
+
+### 3. Robust Scaling and Power Transformation (Yeo-Johnson)
+* **Why**: To stabilize variance and normalize feature distributions. Engineered structural NLP features (such as text length and punctuation counts) follow highly skewed, long-tailed distributions. Applying a `RobustScaler` reduces the influence of extreme outlier copy, while the Yeo-Johnson transformer shifts numeric inputs closer to a normal distribution, improving the convergence of linear baselines.
+
+### 4. Cross-Validated Macro-F1 Optimization via Optuna
+* **Why**: To prevent minority class neglect. In highly imbalanced datasets, overall accuracy can be high even if rare categories are misclassified. Tuning our XGBoost hyperparameters using Optuna on Macro-F1 forces the optimization search to weight minority classes equally, ensuring the model learns the nuances of rare dark patterns.
+
+### 5. Shared Feature Extraction Module
+* **Why**: To eliminate train-serve skew. In ML engineering, redefining text cleaning or tokenization logic for production often introduces subtle bugs. By having both the training pipeline and the Streamlit app import from `src/features.py`, we guarantee that inference features are extracted identically to how they were trained.
+
+### 6. Inference-Time Precision Gate
+* **Why**: To minimize false positives in auditing. Standard classifiers flag violations using simple argmax, which defaults to the class with the highest score even if confidence is low (e.g., 36%). In a compliance tool, false positives disrupt the auditor's workflow. We enforce a $0.65$ probability threshold for dark patterns; predictions failing to meet this gate revert to `"Not a Dark Pattern"`.
+
+### 7. UI Confidence Calibration
+* **Why**: To present realistic uncertainty. Raw classifiers often output overconfident predictions ($99.9\%+$ confidence). We adjust the confidence outputs shown in the Streamlit UI to tone down overconfidence, aligning predictions with real-world user expectations and making the compliance dashboard less alarmist.
+
+---
+
+## 📂 Codebase Architecture
 
 ```
 dark-pattern-pro/
 ├── README.md
 ├── requirements.txt
 ├── notebooks/
-│   ├── 01_data_nlp_eda.ipynb         # data, NLP & EDA
-│   └── 02_model_tuning_export.ipynb  # modeling, tuning & export
+│   ├── 01_data_nlp_eda.ipynb         # EDA, tokenization & keyword extraction
+│   └── 02_model_tuning_export.ipynb  # Cross-validation, Optuna tuning & export
 ├── src/
-│   ├── features.py        # SHARED feature extraction (keywords, clean, 22 features)
-│   ├── collect_data.py    # assemble the manually-collected example pool
-│   ├── build_dataset.py   # CCPA remap + merge + global de-dup -> ccpa_dataset.tsv
-│   ├── make_features.py   # apply features -> features.csv
-│   └── train.py           # scripted mirror of notebook 2 (CV, Optuna, export)
+│   ├── features.py         # Shared module: cleans text, POS tagger & extracts 22 features
+│   ├── collect_data.py     # Aggregates manually gathered legal compliance examples
+│   ├── build_dataset.py    # Merges data sources, remaps academic -> legal labels & de-duplicates
+│   ├── make_features.py    # Transforms text files into tabular dataset (features.csv)
+│   └── train.py            # Automated script mirror of the notebook modeling pipeline
 ├── data/
-│   ├── raw/dataset_raw.tsv   # Yada-2022 source
-│   └── processed/            # ccpa_dataset.tsv, features.csv
-├── models/                # best_multi_model, best_binary_model, label_encoder (.joblib)
-└── app/app.py             # Streamlit compliance dashboard (imports src.features)
+│   ├── raw/dataset_raw.tsv         # Original Yada et al. e-commerce dataset
+│   └── processed/ccpa_dataset.tsv  # Final cleaned & remapped corpus
+├── models/
+│   ├── best_multi_model.joblib     # Tuned 14-class XGBoost model
+│   ├── best_binary_model.joblib    # 2-class violation/benign model
+│   └── label_encoder.joblib        # Scikit-learn Target Class Encoder
+└── app/
+    └── app.py              # Streamlit compliance dashboard
 ```
 
 ---
 
-## 🚀 Run it
+## 🚀 How to Run the Project
 
+### Install Dependencies
 ```bash
 pip install -r requirements.txt
+```
 
-# Reproduce the work (run the two notebooks top to bottom)
+### Reproduce the Notebook Pipeline
+You can run the Jupyter notebooks in order to reproduce the exploratory data analysis, feature engineering, and model training:
+```bash
 jupyter notebook notebooks/01_data_nlp_eda.ipynb
 jupyter notebook notebooks/02_model_tuning_export.ipynb
+```
 
-# Launch the compliance app (uses the exported models)
+Alternatively, you can run the pipeline directly via terminal scripts:
+```bash
+python -m src.collect_data
+python -m src.build_dataset
+python -m src.make_features
+python -m src.train
+```
+
+### Launch the Auditing Dashboard
+Run the Streamlit server locally to launch the UI dashboard:
+```bash
 streamlit run app/app.py
 ```
 
-The `src/` modules provide a command-line mirror of the same workflow
-(`python -m src.collect_data` → `src.build_dataset` → `src.make_features` → `src.train`).
+---
+
+## 🔬 The 22 Engineered NLP Features
+The model operates on a hybrid features space consisting of **TF-IDF n-grams (max 300 features)** and **22 hand-engineered features** representing:
+- **Lexical/Keyword Triggers**: urge_kw_count, scarcity_kw_count, shame_phrase_flag, cancel_diff_score, social_proof_flag, price_drip_flag, discount_claim_flag, neg_option_flag.
+- **Structural Indicators**: all_caps_ratio, exclamation_count, question_count, text_length, word_count, number_present, time_reference_flag.
+- **Part-of-Speech (POS) Mix**: noun_ratio, verb_ratio, adj_ratio, adv_ratio.
+- **TextBlob Sentiment**: sentiment_polarity, sentiment_subjectivity, and average_word_length.
 
 ---
 
-## 🔬 The 22 engineered features
-
-Keyword counts/flags (urgency, scarcity, confirm-shaming, cancellation difficulty, social
-proof, drip pricing, discount, negative-option) · structural signals (all-caps ratio,
-exclamation/question counts, length, word count, number present, time reference) · POS
-ratios (noun/verb/adj/adv) · TextBlob sentiment polarity & subjectivity · average word
-length.
-
-EDA confirms each category lights up its own keyword family, and that dark-pattern text is
-on average wordier and uses more exclamation marks, capitals and subjective language than
-benign UI labels.
-
----
-
-## ⚠️ Limitations
-
-- Some CCPA categories have very few publicly available real-world strings, so their
-  coverage leans on the collected example pool; the Yada-sourced classes are the toughest
-  and score a little lower on the test set (*Disguised Advertisement* 0.91,
-  *Interface Interference* 0.92, *False Urgency* 0.96 F1).
-- Phrasings far outside the training distribution can be mis-routed; broader data
-  collection (e.g. a Playwright crawl of live Indian sites) would harden the model further.
-- The CCPA legal-clause mapping is an interpretive aid, **not legal advice**.
+## ⚠️ Limitations & Real-World Generalization
+- **Class Skew in Rare Categories**: Some CCPA categories (e.g., *Disguised Advertisement*, *Rogue Malware*) are rarely found in public e-commerce datasets. While manually-collected samples and SMOTE stabilize predictions, these classes have smaller support.
+- **Out-of-Distribution Inputs**: Brand new deceptive phrasing that falls far outside the current training distribution can bypass keywords and TF-IDF ranges. 
+- **Not Legal Advice**: This software is designed for auditing assistance. Final compliance decisions should always be reviewed by a human legal counsel.
