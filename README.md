@@ -19,7 +19,7 @@ A compliance auditing tool that reads website/application UI text copy (e.g., ur
 ## 👨‍💻 Author & Credits
 - **Created By**: [Abhishek Goyal](https://github.com/goyashek)
 - **GitHub**: [github.com/goyashek](https://github.com/goyashek)
-- **Kaggle Source**: Indian context compliance dataset sourced from Kaggle: **[Insert Kaggle Dataset Link Here]**
+- **Kaggle Source**: Indian context compliance dataset sourced from Kaggle: **[https://www.kaggle.com/datasets/dhamur/dark-patterns-user-interfaces]**
 
 ---
 
