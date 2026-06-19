@@ -1,4 +1,4 @@
-# 🔍 CCPA 2023 Compliance Classifier: Dark Pattern Detector
+# CCPA 2023 Compliance Classifier: Dark Pattern Detector
 
 <p align="left">
   <a href="https://dark-patterns.streamlit.app/" target="_blank">
