@@ -147,7 +147,7 @@ streamlit run app/app.py
 ---
 
 ## 👨‍💻 Author & Credits
-- **Created By**: [Abhishek Goyal](https://github.com/goyashek)
+- **Created By**: [Abhishek Goyal](https://goyashek.github.io)
 - **GitHub**: [github.com/goyashek](https://github.com/goyashek)
 - **Kaggle Source**: Indian context compliance dataset sourced from Kaggle: **[https://www.kaggle.com/datasets/dhamur/dark-patterns-user-interfaces]**
 
