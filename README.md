@@ -18,7 +18,6 @@ A compliance auditing tool that reads website/application UI text copy (e.g., ur
 
 ## 🇮🇳 Regulatory Context & Motivation
 
-> [!IMPORTANT]
 > On **30 November 2023**, India's CCPA declared **13 categories of dark patterns** illegal under the Consumer Protection Act, 2019. 
 > This tool automates the compliance review of UI text strings against these enforceable legal clauses.
 
