@@ -96,24 +96,24 @@ dark-pattern-pro/
 ├── requirements.txt
 │
 ├── notebooks/
-│   ├── 01_data_nlp_eda.ipynb         # EDA, tokenization & keyword extraction
-│   └── 02_model_tuning_export.ipynb  # Cross-validation, Optuna tuning & export
+│   ├── 01_data_nlp_eda.ipynb              # EDA, tokenization & keyword extraction
+│   └── 02_model_tuning_export.ipynb       # cross-validation , optuna tuning & export
 │
 ├── data/
 │   ├─ raw/
-│       ├── dataset_raw.tsv     # Yada et al. dataset
-│       └── pattern_label.csv   # dataset from kaggle
+│       ├── dataset_raw.tsv                # Yada et al. dataset
+│       └── pattern_label.csv              # dataset from kaggle
 │   └──  processed/
-│       ├── ccpa_dataset.tsv  # cleaned & remapped corpus
-│       └── features.csv # final data after feature engineering
+│       ├── ccpa_dataset.tsv               # cleaned & remapped corpus
+│       └── features.csv                   # final data after feature engineering
 │
 ├── models/
-│   ├── best_multi_model.joblib     # tuned final model
-│   ├── best_binary_model.joblib    # benign model
-│   └── label_encoder.joblib        # target class encoder
+│   ├── best_multi_model.joblib            # tuned final model
+│   ├── best_binary_model.joblib           # benign model
+│   └── label_encoder.joblib               # target class encoder
 │
 └── app/
-    └── app.py              # streamlit dashboard
+    └── app.py                             # streamlit dashboard
 ```
 
 ---
