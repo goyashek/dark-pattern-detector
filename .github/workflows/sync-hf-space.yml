@@ -1,0 +1,34 @@
+name: Sync Hugging Face Space
+
+# Mirror hf_space/ to the HF Space whenever those files change on main.
+# GitHub is the source of truth; this pushes one-way GitHub -> HF.
+on:
+  push:
+    branches: [main]
+    paths: ['hf_space/**']
+  workflow_dispatch: {}      # allow manual runs from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Hugging Face Hub
+        run: pip install -U "huggingface_hub>=0.28,<1.0"
+
+      # Maps local hf_space/* onto the Space ROOT (app.py, requirements.txt, README.md),
+      # which is the path layout the Space needs to run.
+      - name: Upload hf_space/ to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          huggingface-cli upload \
+            goyashek/distilbert-darkpattern \
+            hf_space . \
+            --repo-type space \
+            --commit-message "Sync from GitHub @ ${GITHUB_SHA::7}"
