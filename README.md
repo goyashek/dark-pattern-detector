@@ -2,7 +2,10 @@
 
 <p align="left">
   <a href="https://dark-patterns.streamlit.app/" target="_blank">
-    <img src="https://img.shields.io/badge/Streamlit-Live%20Demo-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Live Demo">
+    <img src="https://img.shields.io/badge/Streamlit-Classical%20Demo-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit Demo">
+  </a>
+  <a href="https://huggingface.co/spaces/goyashek/distilbert-darkpattern" target="_blank">
+    <img src="https://img.shields.io/badge/HuggingFace-DistilBERT%20Demo-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="HF Space Demo">
   </a>
   <a href="https://github.com/goyashek" target="_blank">
     <img src="https://img.shields.io/badge/GitHub-Profile-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Profile">
@@ -12,7 +15,7 @@
 A compliance auditing tool that reads website/application UI text copy (e.g., urgency flags, pre-checked opt-ins, confirm-shaming prompts) and classifies it into one of **14 categories**—India's **13 illegal dark-pattern classes** established by the **Central Consumer Protection Authority (CCPA) in November 2023** plus a *Not a Dark Pattern* (safe/benign) class.
 
 > [!NOTE]
-> **Live Auditing Tool**: Interactive Streamlit dashboard is deployed at [dark-patterns.streamlit.app](https://dark-patterns.streamlit.app/)
+> **Two live demos**: the fast, interpretable **classical** model on [dark-patterns.streamlit.app](https://dark-patterns.streamlit.app/), and the higher-accuracy **fine-tuned DistilBERT** on [its Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern). The tradeoff between them is the heart of this project.
 
 ---
 
@@ -34,8 +37,32 @@ This project maps the academic baseline corpus (**Yada et al. 2022**) onto CCPA 
 | **Label Space** | Binary + 7 Academic Taxonomy Classes | **14 Classes** (13 CCPA Legal Classes + Benign) |
 | **Practical Context** | Academic Research | **Regulatory Compliance & Auditing** |
 | **Class Coverage** | Missing legal categories, high class skew | **All 13 CCPA classes represented** |
-| **Explainability** | Black-box Transformer predictions | **Interpretable NLP features** + active lexical badge triggers |
+| **Explainability** | Black-box Transformer predictions | **Both offered**: an interpretable classical model (lexical badge triggers) *and* a fine-tuned DistilBERT |
 | **Inference Layer** | Raw uncalibrated model outputs | **Precision-gate thresholding + Toned-down UI confidence** |
+
+---
+
+## ⚖️ The Core Tradeoff: Interpretable Classical vs. Fine-Tuned Transformer
+
+The headline of this project isn't a single "best" score — it's an **honest tradeoff**. We took the same problem up a ladder of models and evaluated all of them on one **leak-free split** plus a held-out set of **23 real-world Indian UI strings** (out-of-distribution / OOD).
+
+| Model | Test Macro-F1 | OOD Macro-F1 | Size | Interpretability |
+| :--- | :---: | :---: | :---: | :--- |
+| **DistilBERT** (fine-tuned) | **0.797** | **0.594** | ~269 MB | Low — 66M opaque params |
+| Classical (Linear SVC) | 0.654 | 0.475 | ~2 MB | **High** — per-feature weights |
+| Classical (XGBoost) | 0.639 | 0.373 | ~2 MB | **High** — feature importances |
+| LSTM (from scratch) | 0.618 | 0.444 | ~5 MB | Low — learned embeddings |
+
+> [!NOTE]
+> **Read it as a tradeoff, not a leaderboard.** DistilBERT is the most accurate and the only model that holds up well on genuinely new text — but it is ~100× larger and you cannot point to *why* it fired. The classical model gives up some accuracy but is tiny, instant, and every decision traces back to a keyword or feature. **So we ship classical as the fast, explainable default (Streamlit) and offer DistilBERT for the hard cases (Hugging Face Space).**
+
+### Why a Leak-Free Split Matters
+
+A naive random split reported a flattering **~0.94** macro-F1. But many UI strings are **near-duplicates** (same wording, different brand or price), so a random split lets close siblings land in *both* train and test — the model peeks at the answer. Re-splitting by **normalized skeleton** (so no sibling group spans the split) dropped the honest score to **~0.64**. That ~0.30 gap is the difference between a number that looks good and a number you can trust.
+
+### Why an Out-of-Distribution Test
+
+In-distribution scores still flatter every model. The strongest honesty check is the **23 real Indian UI strings** scraped from live sites and kept entirely out of training. Scores there are lower for *everyone* — what matters is that the **ranking holds**, and that the transformer's edge survives contact with genuinely new text.
 
 ---
 
@@ -45,27 +72,30 @@ This project maps the academic baseline corpus (**Yada et al. 2022**) onto CCPA 
 flowchart LR
 
     A["Yada-2022 Corpus"] --> B["Label Remapping"]
-    C["Kaggle Dataset"] --> D["Dataset Merge"]
+    C["Supplementary<br/>UI-text Corpus"] --> D["Dataset Merge"]
     B --> D
 
-    D --> E["De-duplication"]
-    E --> F["NLP Features + TF-IDF"]
-    F --> G["ColumnTransformer"]
+    D --> E["NLP Features + TF-IDF"]
+    E --> F["Leak-Free Split<br/>(skeleton-aware)"]
 
-    G --> H["SMOTE (CV Folds)"]
-    H --> I["Optuna-Tuned XGBoost"]
+    F --> G["Classical<br/>(SVC / XGBoost)"]
+    F --> H["LSTM<br/>(from scratch)"]
+    F --> I["Fine-Tuned<br/>DistilBERT"]
 
-    I --> J["Precision Gate"]
-    J --> K["Calibration"]
-    K --> L["Joblib Export"]
-    L --> M["Streamlit App"]
+    G --> J["Honest Eval:<br/>leak-free + OOD"]
+    H --> J
+    I --> J
+
+    G --> K["Joblib Export"] --> L["Streamlit App<br/>(classical default)"]
+    I --> M["HF Model Repo"] --> N["Hugging Face Space<br/>(DistilBERT)"]
 ```
 ---
 
 ## 🛠️ Advanced Techniques & Rationale (Why We Did Them)
 
-### 1. Global De-duplication Before Splitting
-* **Why**: Prevents identical UI text strings from appearing in both train and test sets, avoiding data leakage and artificially inflated accuracy.
+### 1. Global De-duplication — and Why It Wasn't Enough
+* **Why**: Removing identical UI strings before splitting is the first defense against train/test leakage.
+* **The catch we found**: exact-match dedup misses **near-duplicates** (same skeleton, different brand/price). A dedicated leak audit re-split the data by **normalized skeleton** so no sibling group spans the split — which is what turned the flattering ~0.94 into the honest ~0.64 (see the tradeoff section above).
 
 ### 2. SMOTE Oversampling Inside Cross-Validation Folds
 * **Why**: Solves class imbalance for rare classes (like *Subscription Trap*) without leaking validation partition data into the training process.
@@ -90,29 +120,35 @@ flowchart LR
 ## 📂 Codebase Architecture
 
 ```
-dark-pattern-pro/
+dark-pattern-detector/
 ├── README.md
 ├── requirements.txt
 │
 ├── notebooks/
 │   ├── 01_data_nlp_eda.ipynb              # EDA, tokenization & keyword extraction
-│   └── 02_model_tuning_export.ipynb       # cross-validation , optuna tuning & export
+│   ├── 02_model_tuning_export.ipynb       # cross-validation, optuna tuning & export
+│   └── 03_deep_learning_transformer.ipynb # LSTM + DistilBERT on the leak-free split + OOD
 │
 ├── data/
 │   ├─ raw/
-│       ├── dataset_raw.tsv                # Yada et al. dataset
-│       └── pattern_label.csv              # dataset from kaggle
+│   │   ├── dataset_raw.tsv                 # Yada et al. corpus
+│   │   └── pattern_label.csv               # supplementary UI-text corpus
 │   └──  processed/
-│       ├── ccpa_dataset.tsv               # cleaned & remapped corpus
-│       └── features.csv                   # final data after feature engineering
+│       ├── ccpa_dataset.tsv                # cleaned & remapped corpus
+│       ├── features.csv                    # final data after feature engineering
+│       └── ood_real_test.csv               # 23 real Indian UI strings (held-out OOD)
 │
 ├── models/
-│   ├── best_multi_model.joblib            # tuned final model
+│   ├── best_multi_model.joblib            # tuned classical model
 │   ├── best_binary_model.joblib           # benign model
 │   └── label_encoder.joblib               # target class encoder
+│                                          # (DistilBERT weights live on the HF Model repo)
 │
-└── app/
-    └── app.py                             # streamlit dashboard
+├── app/
+│   └── app.py                             # Streamlit dashboard (classical)
+│
+└── hf_space/
+    └── app.py                             # Gradio app for the DistilBERT HF Space
 ```
 
 ---
@@ -127,14 +163,16 @@ pip install -r requirements.txt
 ### Reproduce the Modeling Pipeline
 Run Jupyter Notebooks:
 ```bash
-jupyter notebook notebooks/01_data_nlp_eda.ipynb
-jupyter notebook notebooks/02_model_tuning_export.ipynb
+jupyter notebook notebooks/01_data_nlp_eda.ipynb               # data + 22 NLP features
+jupyter notebook notebooks/02_model_tuning_export.ipynb        # classical tuning & export
+jupyter notebook notebooks/03_deep_learning_transformer.ipynb  # LSTM + DistilBERT, leak-free + OOD eval
 ```
 
-### Launch the Dashboard Local Server
+### Launch the Dashboards
 ```bash
-streamlit run app/app.py
+streamlit run app/app.py    # classical model (fast, interpretable default)
 ```
+The fine-tuned **DistilBERT** demo runs as a [Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern) (`hf_space/app.py`), loading its weights from a separate HF Model repo.
 
 ---
 
