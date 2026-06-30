@@ -40,9 +40,17 @@ PRICES = ["99.00", "149.00", "199.00", "299.00", "499.00", "799.00", "999.00", "
 
 SMALL_FEES = ["5.00", "10.00", "15.00", "20.00", "25.00", "30.00", "49.00"]
 
+# Fee names — now grounded in REAL Indian-app fees observed during live scraping
+# (Flipkart payment page, Blinkit cart, BookMyShow, Zepto) and r/FuckFlipkart /
+# r/FuckZepto screenshots. These verbatim names make the synthetic Drip Pricing
+# rows match the real OOD test distribution instead of generic invented fees.
 FEES = ["service charge", "processing fee", "convenience fee", "admin surcharge",
         "handling fee", "cleanup cost", "booking charge", "platform fee",
-        "payment gateway fee", "fulfilment fee", "packaging fee"]
+        "payment gateway fee", "fulfilment fee", "packaging fee",
+        # real, observed:
+        "Protect Promise Fee", "Offer Handling Fee", "Payment Handling Fee",
+        "small cart charge", "handling charge", "delivery charge", "pick up charge",
+        "surge fee", "rain fee", "high demand fee"]
 
 DURATIONS = ["7 days", "15 days", "1 month", "3 months", "6 months", "1 year"]
 
@@ -129,7 +137,7 @@ def gen_bait_switch():
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, file=FILE_TYPES, brand=BRANDS, product=PRODUCTS, software=SOFTWARE,
-        price=["$" + p for p in PRICES], duration=DURATIONS,
+        price=["₹" + p for p in PRICES], duration=DURATIONS,
         pct=["10", "20", "30", "40", "50"]))
 
 
@@ -151,7 +159,7 @@ def gen_saas_billing():
         "Activate trial — recurring {price} fee applies from day {daynum} unless you opt out.",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
-        t, duration=DURATIONS, price=["$" + p for p in PRICES], brand=BRANDS,
+        t, duration=DURATIONS, price=["₹" + p for p in PRICES], brand=BRANDS,
         daynum=["8", "15", "30", "31", "61"]))
 
 
@@ -182,7 +190,7 @@ def gen_basket_sneaking():
         "Premium packaging ({price}) auto-selected for your order.",
         "Support {addon} — {price} added to your cart.",
         "Extended warranty (2 years) automatically added to your {product}.",
-        "A donation of {price} has been added to support local charities.",
+        "A donation of ₹{rupee} has been added to support local charities.",
         "Priority processing added to your cart for faster delivery of your {product}.",
         "Add {brand} membership for only {price} (pre-selected for you).",
         "{addon} included by default ({price}). Uncheck to remove.",
@@ -192,35 +200,50 @@ def gen_basket_sneaking():
         "Bundle deal applied: {product} + {addon} (+{price}) added automatically.",
         "Insurance for your {product} ({price}) has been added to checkout for you.",
         "Cart updated: {addon} (+{price}) selected on your behalf.",
+        # real charity/round-up pre-adds observed on BookMyShow & Blinkit (₹ amounts)
+        "Feeding India donation ₹{rupee} added to your order. Uncheck to remove.",
+        "Give to Underprivileged Musicians (₹{rupee} per ticket) — added by default.",
+        "Round up to the nearest ₹10 and donate the difference (pre-selected).",
+        "A ₹{rupee} contribution to charity has been added to your bill.",
+        "Tip for your delivery partner ₹{rupee} added automatically. Tap to remove.",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
-        t, addon=ADDONS, price=["$" + p for p in SMALL_FEES], product=PRODUCTS, brand=BRANDS))
+        t, addon=ADDONS, price=["₹" + p for p in SMALL_FEES], product=PRODUCTS, brand=BRANDS,
+        rupee=["1", "2", "3", "5", "10", "20"]))
 
 
 def gen_drip_pricing():
+    # Rewritten to ₹ with realistic Indian magnitudes and the VERBATIM fee formats
+    # observed live (Flipkart payment page, Blinkit cart, BookMyShow, MakeMyTrip) and
+    # in r/FuckFlipkart/r/FuckZepto screenshots — so synthetic rows match the real
+    # OOD distribution ("₹3,698 + ₹185 taxes & fees", "Convenience fees ₹52",
+    # "+₹86 Protect Promise Fee", "Small cart charge ₹20").
     T = [
-        "Subtotal: ${p1}. {fee}: ${p2}, handling: ${p3}. Total: ${tot}",
-        "Standard delivery fee of ${p2} applied at the final checkout step.",
-        "Room subtotal: ${p1}. Mandatory cleaning fee: ${p2}, local tax: ${p3}. Total: ${tot}",
-        "Booking fee of ${p2} per ticket added at checkout.",
-        "Final price includes a credit card convenience surcharge of {pct}%.",
-        "Resort fee of ${p2} per night not included in the initial booking price.",
-        "Listed at ${p1}; {fee} of ${p2} and taxes of ${p3} appear only at payment.",
-        "Your {product} is ${p1} — plus a ${p2} {fee} revealed on the last page.",
-        "Ticket price ${p1}. Service charge ${p2}. Delivery ${p3}. You pay ${tot}.",
-        "Almost done! A {fee} of ${p2} has been added to your ${p1} order.",
-        "Price shown excludes a mandatory ${p2} {fee} charged before you can pay.",
-        "Cart total updated from ${p1} to ${tot} after fees were applied at checkout.",
-        "Hotel night: ${p1}. Resort fee ${p2}, city tax ${p3} — total ${tot} due now.",
-        "Free shipping*, *a ${p2} {fee} still applies to all orders.",
+        "₹{p1} + ₹{p2} taxes & fees Per Night",
+        "Subtotal ₹{p1}. {fee} ₹{p2}, handling ₹{p3}. Grand total ₹{tot}",
+        "Convenience fees ₹{p2} added at the final payment step.",
+        "+₹{p2} {fee}",
+        "{fee} ₹{p2}",
+        "Booking fee of ₹{p2} per ticket added at checkout.",
+        "Final price includes a {pct}% payment handling fee.",
+        "Listed at ₹{p1}; {fee} of ₹{p2} and GST of ₹{p3} appear only at payment.",
+        "Your {product} is ₹{p1} — plus a ₹{p2} {fee} revealed on the last page.",
+        "Ticket price ₹{p1}. {fee} ₹{p2}. Delivery ₹{p3}. You pay ₹{tot}.",
+        "Almost done! A ₹{p2} {fee} has been added to your ₹{p1} order.",
+        "Price shown excludes a mandatory ₹{p2} {fee} charged before you can pay.",
+        "Cart total updated from ₹{p1} to ₹{tot} after fees applied at checkout.",
+        "Hotel night ₹{p1}. Resort fee ₹{p2}, city tax ₹{p3} — total ₹{tot} due now.",
+        "Free delivery*, *a ₹{p2} {fee} still applies to all orders.",
+        "Total fees ₹{tot2}: Protect Promise Fee ₹{p3}, Offer Handling Fee ₹{p2}, Payment Handling Fee ₹{p3}.",
+        "Small cart charge ₹{p3} applies on orders below ₹{p1}.",
     ]
 
     def slot(t):
-        p1 = random.choice([25, 39, 45, 79, 120, 199, 249])
-        p2 = random.choice([3, 5, 8, 12, 15, 19])
-        p3 = random.choice([2, 4, 6, 9, 10])
-        return _fmt(t, p1=[p1], p2=[p2], p3=[p3], tot=[p1 + p2 + p3],
-                    fee=FEES, product=PRODUCTS, pct=["2", "3", "4", "5"])
+        p1 = random.choice([149, 199, 299, 499, 799, 1199, 1999, 3698, 7500])
+        p2 = random.choice([15, 20, 39, 52, 86, 99, 149, 185, 199])
+        p3 = random.choice([5, 9, 10, 19, 25, 49])
+        return _fmt(t, p1=[p1], p2=[p2], p3=[p3], tot=[p1 + p2 + p3], tot2=[p2 + 2 * p3],
+                    fee=FEES, product=PRODUCTS, pct=["2", "3", "5"])
     return _generate(T, PER_CLASS, slot)
 
 
@@ -271,7 +294,7 @@ def gen_subscription_trap():
     T = [
         "To cancel your {brand} VIP membership, call our hotline at 1-888-555-0{num}.",
         "Cancellation requests must be sent via registered mail to our corporate office.",
-        "You can cancel online, but a ${fee} cancellation fee will apply.",
+        "You can cancel online, but a ₹{fee} cancellation fee will apply.",
         "To cancel your plan, chat with a live agent (Mon-Fri, 9 AM - 5 PM only).",
         "To stop recurring billing, email support@{brandl}.com at least {duration} before renewal.",
         "Your {brand} plan renews automatically; cancellation requires {num} business days' notice.",
@@ -279,7 +302,7 @@ def gen_subscription_trap():
         "Call the retention team to cancel — wait times may exceed {num} minutes.",
         "Cancel anytime* (*by mailing a signed form to our {brand} head office).",
         "To end your subscription, complete the {num}-step verification with an agent.",
-        "Membership auto-renews at the full rate; a ${fee} fee applies if you leave early.",
+        "Membership auto-renews at the full rate; a ₹{fee} fee applies if you leave early.",
         "We're sorry to see you go — confirm cancellation by calling during business hours.",
         "Pausing is easy; cancelling requires speaking to a {brand} loyalty specialist.",
         "Your free trial converts to a paid plan; cancel only via post within {duration}.",
@@ -343,20 +366,20 @@ def gen_benign_numeric():
         "Rating: {rating} out of 5 stars",
         "Based on {n3} customer reviews",
         "Delivery within {n1}-{n2} business days",
-        "Free shipping on orders over ${price}",
-        "Standard delivery: ${price}",
+        "Free shipping on orders over ₹{price}",
+        "Standard delivery: ₹{price}",
         "Call us at +1-800-{n3}-{n2}",
         "Copyright (c) {year} {brand}",
         "Showing {n2} products in {category}",
-        "Filter by price: ${n1} - ${n3}",
+        "Filter by price: ₹{n1} - ₹{n3}",
         "{n1} items in your shopping cart",
         "Order #{n3}{n2}",
         "Size: {n1} (US)",
         "Estimated delivery date: July {n1}",
-        "Price: ${price}",
+        "Price: ₹{price}",
         "Qty: {n1}",
         "Showing {n2} of {n3} reviews",
-        "You saved ${price} on this order",
+        "You saved ₹{price} on this order",
         "Open daily from 9 AM to 6 PM",
         "Item weight: {n1} lbs",
         "Resolution: 1920x1080",
