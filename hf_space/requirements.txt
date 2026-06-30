@@ -1,0 +1,8 @@
+# HF Space (CPU Basic) — DistilBERT inference only.
+# IMPORTANT: gradio is NOT listed here. The Space SDK (sdk_version in README.md)
+# installs gradio with its own coherent fastapi/starlette/pydantic set — listing
+# gradio here too made pip resolve a skewed web stack that crashed jinja2 at runtime.
+# We only pin what the SDK doesn't manage: the model runtime.
+torch>=2.2
+transformers>=4.40,<5.0
+huggingface_hub>=0.28,<1.0
