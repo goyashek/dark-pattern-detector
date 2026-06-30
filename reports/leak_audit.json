@@ -1,48 +1,55 @@
 {
-  "n_rows": 3896,
+  "n_rows": 4391,
   "n_classes": 14,
   "skeleton_clusters": {
-    "total_clusters": 2479,
-    "multi_row_clusters": 107
+    "total_clusters": 2570,
+    "multi_row_clusters": 158,
+    "largest_clusters": {
+      "order the <slot> shown \u2014 you receive a cheaper look-alike from <slot> instead.": 32,
+      "bundle deal applied: <slot> + <slot> (+<cur>) added automatically.": 30,
+      "advertised: <slot> for <cur>. at checkout only the <slot> rental is offered.": 29,
+      "free trial of <slot> (the 'free' plan silently becomes paid after <slot>)": 27,
+      "upgrade to <slot> pro: <cur> now, then auto-charged every <slot>.": 26
+    }
   },
   "naive_split": {
-    "test_size": 780,
-    "cross_split_clusters": 93,
-    "leaked_test_rows": 312,
-    "leaked_test_pct": 40.0
+    "test_size": 879,
+    "cross_split_clusters": 140,
+    "leaked_test_rows": 400,
+    "leaked_test_pct": 45.5
   },
   "leak_free_split": {
-    "train_size": 3012,
-    "test_size": 884,
+    "train_size": 3486,
+    "test_size": 905,
     "cross_split_clusters": 0,
     "leaked_test_rows": 0
   },
   "models": {
     "svc": {
-      "macro_f1_naive": 0.9393,
-      "macro_f1_leakfree": 0.607,
-      "macro_f1_drop": 0.3324,
-      "relative_pct": 35.4
+      "macro_f1_naive": 0.9364,
+      "macro_f1_leakfree": 0.6543,
+      "macro_f1_drop": 0.2821,
+      "relative_pct": 30.1
     },
     "xgb": {
-      "macro_f1_naive": 0.9446,
-      "macro_f1_leakfree": 0.6387,
-      "macro_f1_drop": 0.3059,
-      "relative_pct": 32.4
+      "macro_f1_naive": 0.9491,
+      "macro_f1_leakfree": 0.6477,
+      "macro_f1_drop": 0.3014,
+      "relative_pct": 31.8
     }
   },
   "headline_model": "xgb",
   "trivial_probes": {
     "currency_symbol": {
-      "macro_f1": 0.04510145532520451,
+      "macro_f1": 0.009313362323508883,
       "n_dollar_rows": 43,
-      "n_rupee_rows": 475
+      "n_rupee_rows": 473
     },
     "text_length": {
-      "macro_f1": 0.15841870389598306
+      "macro_f1": 0.15513456380675184
     },
     "keyword_only": {
-      "macro_f1": 0.55371537332475
+      "macro_f1": 0.6152611967338035
     }
   },
   "pipeline": "TF-IDF 1-3gram x300 + 22 num feats -> SMOTE -> {clf}; tuned params from NB2 Optuna",
