@@ -1,0 +1,50 @@
+{
+  "n_rows": 3896,
+  "n_classes": 14,
+  "skeleton_clusters": {
+    "total_clusters": 2479,
+    "multi_row_clusters": 107
+  },
+  "naive_split": {
+    "test_size": 780,
+    "cross_split_clusters": 93,
+    "leaked_test_rows": 312,
+    "leaked_test_pct": 40.0
+  },
+  "leak_free_split": {
+    "train_size": 3012,
+    "test_size": 884,
+    "cross_split_clusters": 0,
+    "leaked_test_rows": 0
+  },
+  "models": {
+    "svc": {
+      "macro_f1_naive": 0.9393,
+      "macro_f1_leakfree": 0.607,
+      "macro_f1_drop": 0.3324,
+      "relative_pct": 35.4
+    },
+    "xgb": {
+      "macro_f1_naive": 0.9446,
+      "macro_f1_leakfree": 0.6387,
+      "macro_f1_drop": 0.3059,
+      "relative_pct": 32.4
+    }
+  },
+  "headline_model": "xgb",
+  "trivial_probes": {
+    "currency_symbol": {
+      "macro_f1": 0.04510145532520451,
+      "n_dollar_rows": 43,
+      "n_rupee_rows": 475
+    },
+    "text_length": {
+      "macro_f1": 0.15841870389598306
+    },
+    "keyword_only": {
+      "macro_f1": 0.55371537332475
+    }
+  },
+  "pipeline": "TF-IDF 1-3gram x300 + 22 num feats -> SMOTE -> {clf}; tuned params from NB2 Optuna",
+  "seed": 42
+}
