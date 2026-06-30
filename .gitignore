@@ -1,0 +1,18 @@
+# OS / editor junk
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# Local planning/docs — only README.md is tracked
+*.md
+!README.md
+
+# Scrape tooling & local-only artifacts
+.playwright-mcp
+data/raw/screenshots/
+data/raw/scraped_candidates.csv
+
+# Regenerated reports (held until model work settles)
+reports/
