@@ -2,8 +2,14 @@
 train.py — Leakage-safe training, tuning and honest evaluation (Route 1: classical ML).
 
 Methodology fixes vs. the original project:
-  * GLOBAL DEDUP already done upstream, so no string appears in both train and test.
-  * A held-out TEST set (20%) is carved out FIRST and never touched during tuning.
+  * The held-out TEST set is the TEMPLATE-AWARE leak-free split from src/leak_audit.py
+    (reports/leak_free_split.json), NOT a random split. Global dedup removes only exact
+    duplicates; the corpus is heavily templated, so a random split lets sibling rows of
+    the same skeleton (differing only by brand/price) straddle train and test -> ~65% of
+    a naive test set has a train twin, inflating macro-F1 to ~0.96. The skeleton-grouped
+    split is what makes the reported number honest (~0.63).
+  * A staleness guard asserts the split indices fit the current features.csv, so a stale
+    split can never again be silently paired with regenerated features.
   * 5 classical models compared with Stratified 5-fold CV; SMOTE is fit INSIDE each
     fold (via imblearn Pipeline) so no synthetic minority sample leaks into validation.
   * Optuna tunes XGBoost using CROSS-VALIDATION macro-F1 on the training split only
@@ -26,7 +32,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from sklearn.model_selection import StratifiedKFold, train_test_split, cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import RobustScaler, PowerTransformer, MinMaxScaler, LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -48,9 +54,34 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEAT_PATH = os.path.join(HERE, "data", "processed", "features.csv")
+SPLIT_PATH = os.path.join(HERE, "reports", "leak_free_split.json")
 MODELS_DIR = os.path.join(HERE, "models")
 REPORTS_DIR = os.path.join(HERE, "reports")
 RANDOM_STATE = 42
+
+
+def load_leakfree_split(n_rows):
+    """Load the template-aware split written by src.leak_audit and verify it matches
+    the current features.csv. The staleness guard is the whole point: the honest number
+    is only honest if these indices index THIS dataframe. If features.csv was regenerated
+    (e.g. after refreshing the corpus) without re-running the audit, the indices go stale
+    and silently pair a 4391-row split with a 6373-row frame — exactly the bug this fixes.
+    """
+    if not os.path.exists(SPLIT_PATH):
+        raise SystemExit(
+            f"Leak-free split not found: {SPLIT_PATH}\n"
+            "Run `python -m src.make_features && python -m src.leak_audit` first.")
+    split = json.load(open(SPLIT_PATH))
+    tr, te = split["train"], split["test"]
+    covered = len(tr) + len(te)
+    max_idx = max(max(tr), max(te))
+    if covered != n_rows or max_idx != n_rows - 1:
+        raise SystemExit(
+            f"STALE SPLIT: leak_free_split.json covers {covered} rows (max index {max_idx}) "
+            f"but features.csv has {n_rows} rows.\n"
+            "The split and features are out of sync. Re-run `python -m src.leak_audit` "
+            "against the current features.csv before training.")
+    return tr, te
 
 
 def make_preprocessor(scaler):
@@ -78,10 +109,11 @@ def main():
     y = le.fit_transform(df["Pattern Category"])
     print(f"Loaded {len(df)} rows, {len(le.classes_)} classes.")
 
-    # ---- held-out test set carved out FIRST --------------------------------
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y, test_size=0.20, stratify=y, random_state=RANDOM_STATE)
-    print(f"Train: {len(X_tr)}  Test (held-out): {len(X_te)}")
+    # ---- load the TEMPLATE-AWARE leak-free split (not a random one) ---------
+    tr_idx, te_idx = load_leakfree_split(len(df))
+    X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
+    y_tr, y_te = y[tr_idx], y[te_idx]
+    print(f"Train: {len(X_tr)}  Test (held-out, leak-free): {len(X_te)}")
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
 
@@ -179,10 +211,10 @@ def main():
     fig.savefig(os.path.join(REPORTS_DIR, "confusion_matrix.png"), dpi=120)
     plt.close(fig)
 
-    # ---- binary violation model (held-out eval) ----------------------------
+    # ---- binary violation model (held-out eval, SAME leak-free split) ------
     yb = df["label"].astype(int).values
-    Xb_tr, Xb_te, yb_tr, yb_te = train_test_split(
-        X, yb, test_size=0.20, stratify=yb, random_state=RANDOM_STATE)
+    Xb_tr, Xb_te = X.iloc[tr_idx], X.iloc[te_idx]
+    yb_tr, yb_te = yb[tr_idx], yb[te_idx]
     bin_pipe = ImbPipeline([
         ("prep", make_preprocessor(std_numeric())),
         ("smote", SMOTE(random_state=RANDOM_STATE)),

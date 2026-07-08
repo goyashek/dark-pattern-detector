@@ -1,55 +1,55 @@
 {
-  "n_rows": 4391,
+  "n_rows": 6373,
   "n_classes": 14,
   "skeleton_clusters": {
-    "total_clusters": 2570,
-    "multi_row_clusters": 158,
+    "total_clusters": 2620,
+    "multi_row_clusters": 284,
     "largest_clusters": {
-      "order the <slot> shown \u2014 you receive a cheaper look-alike from <slot> instead.": 32,
-      "bundle deal applied: <slot> + <slot> (+<cur>) added automatically.": 30,
-      "advertised: <slot> for <cur>. at checkout only the <slot> rental is offered.": 29,
-      "free trial of <slot> (the 'free' plan silently becomes paid after <slot>)": 27,
-      "upgrade to <slot> pro: <cur> now, then auto-charged every <slot>.": 26
+      "no thanks, i don't want to save <pct> on my <slot>.": 96,
+      "your photos are at risk! <num> threats detected \u2014 secure them with <slot> now.": 85,
+      "alert: <num> viruses found. tap to remove them with <slot> before damage spreads.": 81,
+      "uncheck to avoid not saving <pct> on your <slot>.": 64,
+      "to cancel your <slot> vip membership, call our hotline at <num>-<num>-<num>-<num>.": 53
     }
   },
   "naive_split": {
-    "test_size": 879,
-    "cross_split_clusters": 140,
-    "leaked_test_rows": 400,
-    "leaked_test_pct": 45.5
+    "test_size": 1275,
+    "cross_split_clusters": 225,
+    "leaked_test_rows": 826,
+    "leaked_test_pct": 64.8
   },
   "leak_free_split": {
-    "train_size": 3486,
-    "test_size": 905,
+    "train_size": 5134,
+    "test_size": 1239,
     "cross_split_clusters": 0,
     "leaked_test_rows": 0
   },
   "models": {
     "svc": {
-      "macro_f1_naive": 0.9364,
-      "macro_f1_leakfree": 0.6543,
-      "macro_f1_drop": 0.2821,
-      "relative_pct": 30.1
+      "macro_f1_naive": 0.9473,
+      "macro_f1_leakfree": 0.577,
+      "macro_f1_drop": 0.3703,
+      "relative_pct": 39.1
     },
     "xgb": {
-      "macro_f1_naive": 0.9491,
-      "macro_f1_leakfree": 0.6477,
-      "macro_f1_drop": 0.3014,
-      "relative_pct": 31.8
+      "macro_f1_naive": 0.9631,
+      "macro_f1_leakfree": 0.527,
+      "macro_f1_drop": 0.436,
+      "relative_pct": 45.3
     }
   },
   "headline_model": "xgb",
   "trivial_probes": {
     "currency_symbol": {
-      "macro_f1": 0.009313362323508883,
-      "n_dollar_rows": 43,
-      "n_rupee_rows": 473
+      "macro_f1": 0.052914053901545674,
+      "n_dollar_rows": 44,
+      "n_rupee_rows": 1139
     },
     "text_length": {
-      "macro_f1": 0.15513456380675184
+      "macro_f1": 0.13127297729332937
     },
     "keyword_only": {
-      "macro_f1": 0.6152611967338035
+      "macro_f1": 0.6138591622628263
     }
   },
   "pipeline": "TF-IDF 1-3gram x300 + 22 num feats -> SMOTE -> {clf}; tuned params from NB2 Optuna",
