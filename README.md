@@ -48,17 +48,17 @@ The headline of this project isn't a single "best" score — it's an **honest tr
 
 | Model | Test Macro-F1 | OOD Macro-F1 | Size | Interpretability |
 | :--- | :---: | :---: | :---: | :--- |
-| **DistilBERT** (fine-tuned) | **0.797** | **0.594** | ~269 MB | Low — 66M opaque params |
-| Classical (Linear SVC) | 0.654 | 0.475 | ~2 MB | **High** — per-feature weights |
-| Classical (XGBoost) | 0.639 | 0.373 | ~2 MB | **High** — feature importances |
-| LSTM (from scratch) | 0.618 | 0.444 | ~5 MB | Low — learned embeddings |
+| **DistilBERT** (fine-tuned) | **0.869** | **0.778** | ~269 MB | Low — 66M opaque params |
+| Classical (Linear SVC) | 0.576 | 0.518 | ~2 MB | **High** — per-feature weights |
+| Classical (XGBoost) | 0.562 | 0.302 | ~2 MB | **High** — feature importances |
+| LSTM (from scratch) | 0.559 | 0.385 | ~5 MB | Low — learned embeddings |
 
 > [!NOTE]
-> **Read it as a tradeoff, not a leaderboard.** DistilBERT is the most accurate and the only model that holds up well on genuinely new text — but it is ~100× larger and you cannot point to *why* it fired. The classical model gives up some accuracy but is tiny, instant, and every decision traces back to a keyword or feature. **So we ship classical as the fast, explainable default (Streamlit) and offer DistilBERT for the hard cases (Hugging Face Space).**
+> **Read it as a tradeoff, not a leaderboard.** DistilBERT is far and away the most accurate, and the only model that holds up on genuinely new text (OOD 0.778 vs ~0.52 for the best classical) — but it is ~100× larger and you cannot point to *why* it fired. The classical model gives up a lot of accuracy on the hard, context-dependent classes but is tiny, instant, and every decision traces back to a keyword or feature. **So we ship classical as the fast, explainable default (Streamlit) and offer DistilBERT for the hard cases (Hugging Face Space).** The wide gap is itself the finding: on short UI strings, understanding *phrasing* beats counting keywords.
 
 ### Why a Leak-Free Split Matters
 
-A naive random split reported a flattering **~0.94** macro-F1. But many UI strings are **near-duplicates** (same wording, different brand or price), so a random split lets close siblings land in *both* train and test — the model peeks at the answer. Re-splitting by **normalized skeleton** (so no sibling group spans the split) dropped the honest score to **~0.64**. That ~0.30 gap is the difference between a number that looks good and a number you can trust.
+A naive random split reported a flattering **~0.96** macro-F1. But many UI strings are **near-duplicates** (same wording, different brand or price) — on this corpus **64.8%** of a naive test set has a template twin sitting in train, so the model peeks at the answer. Re-splitting by **normalized skeleton** (so no sibling group spans the split) dropped the honest classical score to **~0.56**. That ~0.40 gap is the difference between a number that looks good and a number you can trust.
 
 ### Why an Out-of-Distribution Test
 
@@ -95,7 +95,7 @@ flowchart LR
 
 ### 1. Global De-duplication — and Why It Wasn't Enough
 * **Why**: Removing identical UI strings before splitting is the first defense against train/test leakage.
-* **The catch we found**: exact-match dedup misses **near-duplicates** (same skeleton, different brand/price). A dedicated leak audit re-split the data by **normalized skeleton** so no sibling group spans the split — which is what turned the flattering ~0.94 into the honest ~0.64 (see the tradeoff section above).
+* **The catch we found**: exact-match dedup misses **near-duplicates** (same skeleton, different brand/price). A dedicated leak audit re-split the data by **normalized skeleton** so no sibling group spans the split — which is what turned the flattering ~0.96 into the honest ~0.56 (see the tradeoff section above).
 
 ### 2. SMOTE Oversampling Inside Cross-Validation Folds
 * **Why**: Solves class imbalance for rare classes (like *Subscription Trap*) without leaking validation partition data into the training process.
