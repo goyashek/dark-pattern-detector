@@ -27,6 +27,46 @@ PER_CLASS = 320          # target unique rows per dark-pattern class
 BENIGN_TARGET = 700      # extra benign / "Not a Dark Pattern" rows
 
 # --------------------------------------------------------------------------- #
+# OOD contamination guard
+# --------------------------------------------------------------------------- #
+# data/processed/ood_real_test.csv is a HELD-OUT set of real Indian UI strings used as the
+# honest out-of-distribution test. When we add short synthetic fragments we want stylistic
+# SIBLINGS of those strings, never the strings themselves — otherwise the OOD score is
+# contaminated and any improvement is fake. This guard makes that impossible by construction:
+# any generated row that normalises to the same skeleton as an OOD row is rejected.
+
+
+def _ood_norm(s):
+    """Normalise to a skeleton for blocklist matching: lowercase, drop digits, strip
+    punctuation/currency, collapse whitespace. So "Pick up charge ₹199" and a synthetic
+    "pick up charge ₹49" both reduce to 'pick up charge' and collide."""
+    s = str(s).lower()
+    s = re.sub(r"\d+", " ", s)
+    s = re.sub(r"[^a-z ]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _load_ood_blocklist():
+    """frozenset of normalised OOD strings; empty (with a warning) if the file is absent."""
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(here, "data", "processed", "ood_real_test.csv")
+    if not os.path.exists(path):
+        print(f"WARNING: OOD blocklist file not found ({path}); contamination guard is OFF")
+        return frozenset()
+    forms = set()
+    with open(path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            txt = row.get("text", "")
+            n = _ood_norm(txt)
+            if n:
+                forms.add(n)
+    return frozenset(forms)
+
+
+_OOD_BLOCKLIST = _load_ood_blocklist()
+_BLOCKED_COUNT = 0       # incremented by _generate() each time a candidate is rejected
+
+# --------------------------------------------------------------------------- #
 # Shared slot pools
 # --------------------------------------------------------------------------- #
 BRANDS = ["Tata CLiQ", "Flipkart", "Meesho", "IndiaMART", "Snapdeal", "AJIO",
@@ -77,7 +117,10 @@ def _fmt(template, **pools):
 
 
 def _generate(templates, n, slot_fn):
-    """Sample up to `n` UNIQUE strings from `templates` using slot_fn() per draw."""
+    """Sample up to `n` UNIQUE strings from `templates` using slot_fn() per draw.
+    Candidates that collide with the held-out OOD set (by normalised skeleton) are
+    rejected so the synthetic data can never contaminate the OOD test."""
+    global _BLOCKED_COUNT
     seen = set()
     out = []
     attempts = 0
@@ -87,9 +130,13 @@ def _generate(templates, n, slot_fn):
         t = random.choice(templates)
         s = slot_fn(t).strip()
         s = re.sub(r"\s+", " ", s)
-        if s and s.lower() not in seen:
-            seen.add(s.lower())
-            out.append(s)
+        if not s or s.lower() in seen:
+            continue
+        if _ood_norm(s) in _OOD_BLOCKLIST:
+            _BLOCKED_COUNT += 1
+            continue
+        seen.add(s.lower())
+        out.append(s)
     return out
 
 
@@ -112,6 +159,15 @@ def gen_nagging():
         "Join {brand} Rewards now and start earning points instantly. [Later] [Join]",
         "Connect your contacts to find friends already on {brand}. [Not now] [Connect]",
         "Rate {brand} 5 stars to keep the app free. [Not now] [Rate Now]",
+        # short fragments — real nags are terse CTAs (cf. OOD "Download App")
+        "Open in {brand} app",
+        "Get the {brand} app",
+        "Allow {brand} alerts",
+        "Enable location for {brand}",
+        "Rate {brand} 5 stars",
+        "Turn on notifications",
+        "Add {brand} to home screen",
+        "Install {brand} now",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, product=PRODUCTS, brand=BRANDS,
@@ -157,6 +213,14 @@ def gen_saas_billing():
         "Continue with the free plan? It upgrades to {price}/mo after {duration} of use.",
         "Your card on file will be charged {price} when the {duration} promo ends.",
         "Activate trial — recurring {price} fee applies from day {daynum} unless you opt out.",
+        # short fragments — real plan cards compress the auto-renew trap to a price line
+        "{price}/month after",
+        "Then {price}/year",
+        "Auto-renews monthly",
+        "Renews at {price}",
+        "Free for {duration}",
+        "Billed automatically",
+        "{price}/mo after trial",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, duration=DURATIONS, price=["₹" + p for p in PRICES], brand=BRANDS,
@@ -179,6 +243,15 @@ def gen_rogue_malware():
         "Suspicious activity on your account. Verify by installing the {brand} security app.",
         "Memory almost full due to junk files. Free up space instantly with {software}.",
         "Flash Player is outdated and unsafe. Update to {software} to keep watching videos.",
+        # short fragments — real scareware overlays shout in 1-3 words
+        "Virus detected!",
+        "{num} threats found",
+        "Scan device now",
+        "Your device is at risk",
+        "Clean with {software}",
+        "Battery damaged!",
+        "Tap to fix now",
+        "Update {software} now",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, num=[str(n) for n in range(2, 18)], brand=BRANDS, software=SOFTWARE))
@@ -206,10 +279,18 @@ def gen_basket_sneaking():
         "Round up to the nearest ₹10 and donate the difference (pre-selected).",
         "A ₹{rupee} contribution to charity has been added to your bill.",
         "Tip for your delivery partner ₹{rupee} added automatically. Tap to remove.",
+        # short fragments — real pre-adds are terse cart lines (siblings of the OOD charity/tip rows)
+        "Donate ₹{rupee} added",
+        "Tip ₹{rupee} added",
+        "{addon} added (₹{price2})",
+        "Round-up ₹{rupee} added",
+        "Charity ₹{rupee} added",
+        "Gift wrap added",
+        "Pre-selected for you",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, addon=ADDONS, price=["₹" + p for p in SMALL_FEES], product=PRODUCTS, brand=BRANDS,
-        rupee=["1", "2", "3", "5", "10", "20"]))
+        price2=SMALL_FEES, rupee=["1", "2", "3", "5", "10", "20"]))
 
 
 def gen_drip_pricing():
@@ -236,14 +317,25 @@ def gen_drip_pricing():
         "Free delivery*, *a ₹{p2} {fee} still applies to all orders.",
         "Total fees ₹{tot2}: Protect Promise Fee ₹{p3}, Offer Handling Fee ₹{p2}, Payment Handling Fee ₹{p3}.",
         "Small cart charge ₹{p3} applies on orders below ₹{p1}.",
+        # short fragments — bare fee labels (siblings of the OOD fee rows; SAFE_FEE avoids
+        # the exact OOD names, and the guard rejects any accidental collision)
+        "{sfee} ₹{p2}",
+        "+₹{p2} {sfee}",
+        "{sfee} extra",
+        "₹{p2} {sfee} at checkout",
+        "Taxes & fees ₹{p2}",
+        "Mandatory {sfee}",
     ]
+
+    SAFE_FEE = ["packing charge", "rider fee", "doorstep fee", "surge fee", "platform charge",
+                "fulfilment charge", "late-night fee", "peak fee", "carry bag fee"]
 
     def slot(t):
         p1 = random.choice([149, 199, 299, 499, 799, 1199, 1999, 3698, 7500])
         p2 = random.choice([15, 20, 39, 52, 86, 99, 149, 185, 199])
         p3 = random.choice([5, 9, 10, 19, 25, 49])
         return _fmt(t, p1=[p1], p2=[p2], p3=[p3], tot=[p1 + p2 + p3], tot2=[p2 + 2 * p3],
-                    fee=FEES, product=PRODUCTS, pct=["2", "3", "5"])
+                    fee=FEES, sfee=SAFE_FEE, product=PRODUCTS, pct=["2", "3", "5"])
     return _generate(T, PER_CLASS, slot)
 
 
@@ -263,6 +355,17 @@ def gen_forced_action():
         "Allow access to your contacts to unlock the {file}.",
         "Refer {num} friends within {duration} or lose your saved cart.",
         "Subscribe to the newsletter to access your {product} warranty details.",
+        # short fragments — real forced-action gates are terse (sibling of OOD "Login to Proceed")
+        "Sign in to continue",
+        "Verify to continue",
+        "Sign up to view {product}",
+        "Login to see {product}",
+        "Share {product} to unlock",
+        "Verify your number",
+        "Sign in for {brand}",
+        "Log in to unlock {product}",
+        "Follow {brand} to continue",
+        "Refer to unlock {product}",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, brand=BRANDS, file=FILE_TYPES, product=PRODUCTS, duration=DURATIONS,
@@ -285,6 +388,14 @@ def gen_trick_question():
         "[ ] Please do not remove me from the list I never joined.",
         "Select 'No' if you don't want to disable not receiving partner offers.",
         "Uncheck to avoid not saving {pct}% on your {product}.",
+        # short fragments — terse double-negative opt-outs ({product} keeps them <=4 words)
+        "Untick {product} offers",
+        "Uncheck {product} alerts",
+        "[ ] Opt out",
+        "Don't unsubscribe me",
+        "Keep me subscribed [x]",
+        "Untick to decline",
+        "Leave checked to stay in",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, brand=BRANDS, product=PRODUCTS, pct=["5", "10", "15", "20"]))
@@ -306,6 +417,15 @@ def gen_subscription_trap():
         "We're sorry to see you go — confirm cancellation by calling during business hours.",
         "Pausing is easy; cancelling requires speaking to a {brand} loyalty specialist.",
         "Your free trial converts to a paid plan; cancel only via post within {duration}.",
+        # short fragments — terse cancellation walls (sibling of OOD "...does not support booking cancellation")
+        "No cancellation for {brand} plans",
+        "Cannot cancel {brand} online",
+        "Call {brand} to cancel",
+        "{brand} plan is non-refundable",
+        "Cancellation fee ₹{fee} applies",
+        "Cancel {brand} only by post",
+        "No refunds on {brand}",
+        "Cancel within {duration} only",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, brand=BRANDS, brandl=[b.lower() for b in BRANDS], duration=DURATIONS,
@@ -330,7 +450,9 @@ def gen_interface_interference():
                     "Same colour as the background", "Buried three menus deep",
                     "Greyed out, low contrast"]
     T = ["{a} [{as_}] / {r} [{rs}]"]
-    return _generate(T, PER_CLASS, lambda t: _fmt(
+    # short fragments — a lone visually-loaded confirm vs a buried decline
+    T_short = ["{a} [{as_}]", "{r} [{rs}]"]
+    return _generate(T + T_short, PER_CLASS, lambda t: _fmt(
         _fmt(t, a=accept, as_=accept_style, r=reject, rs=reject_style),
         brand=BRANDS, addon=ADDONS, product=PRODUCTS))
 
@@ -351,10 +473,45 @@ def gen_confirm_shaming():
         "Cancel anyway; I don't mind losing my {brand} rewards.",
         "No, keep me uninformed about price drops on {product}.",
         "I prefer paying the {fee} fee instead of going premium.",
+        # short fragments — terse guilt-trip decline buttons
+        "No, full price for me",
+        "Skip my {pct}% discount",
+        "No, I'll pay more for {product}",
+        "No deals for me",
+        "I don't want to save on {product}",
+        "No thanks, I like paying {fee}",
+        "Skip — savings aren't for me",
     ]
     return _generate(T, PER_CLASS, lambda t: _fmt(
         t, pct=["5", "10", "15", "20", "25", "30"], product=PRODUCTS, brand=BRANDS,
         fee=["delivery", "service", "handling", "booking"]))
+
+
+def gen_disguised_ad():
+    """Ads dressed as organic content. Currently 100% real in the corpus and a clean OOD
+    failure ('Promoted', 'Sponsored' fragments) — add short synthetic ad markers so the
+    class isn't tied to long text. Siblings of the OOD rows, never copies."""
+    T = [
+        "Sponsored",
+        "Sponsored listing",
+        "Sponsored · {brand}",
+        "{brand} · Ad",
+        "Ad · {product}",
+        "Featured pick",
+        "Featured · {brand}",
+        "Partner offer",
+        "Recommended for you",
+        "You may also like ({brand})",
+        "Suggested for you",
+        "Promoted by {brand}",
+        "Top pick · sponsored",
+        "{product} — sponsored result",
+        "Paid partnership with {brand}",
+        "Trending · sponsored",
+        "Editor's pick ({brand})",
+        "Handpicked for you",
+    ]
+    return _generate(T, PER_CLASS, lambda t: _fmt(t, brand=BRANDS, product=PRODUCTS))
 
 
 def gen_benign_numeric():
@@ -413,6 +570,7 @@ GENERATORS = {
     "Subscription Trap": (gen_subscription_trap, 1),
     "Interface Interference": (gen_interface_interference, 1),
     "Confirm Shaming": (gen_confirm_shaming, 1),
+    "Disguised Advertisement": (gen_disguised_ad, 1),
     "Not a Dark Pattern": (gen_benign_numeric, 0),
 }
 
@@ -449,9 +607,17 @@ def main():
             r = {k: re.sub(r"[\t\r\n]+", " ", str(v)) for k, v in r.items()}
             w.writerow(r)
     print(f"Wrote {len(rows)} collected rows -> {out_path}")
-    print("Unique strings per class:")
+    print(f"OOD blocklist: {len(_OOD_BLOCKLIST)} forms loaded; "
+          f"{_BLOCKED_COUNT} candidate(s) rejected as OOD collisions")
+    print("Unique strings per class (short% = rows with <=4 words):")
+    by_class = {}
+    for r in rows:
+        by_class.setdefault(r["Pattern Category"], []).append(r["text"])
     for k, v in sorted(summary.items(), key=lambda kv: -kv[1]):
-        print(f"  {k:24} {v}")
+        texts = by_class.get(k, [])
+        short = sum(1 for t in texts if len(t.split()) <= 4)
+        pct = round(100 * short / len(texts), 1) if texts else 0.0
+        print(f"  {k:24} {v:4d}  short={pct}%")
 
 
 if __name__ == "__main__":
