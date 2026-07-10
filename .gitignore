@@ -21,3 +21,4 @@ reports/
 # Host on Hugging Face Hub (or Git-LFS); keep out of normal git.
 models/distilbert_darkpattern/
 /.baseline_4391
+colab/model.safetensors
