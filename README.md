@@ -44,16 +44,16 @@ This project maps the academic baseline corpus (**Yada et al. 2022**) onto CCPA 
 
 ## ⚖️ The Core Tradeoff: Interpretable Classical vs. Fine-Tuned Transformer
 
-All three models have now been rerun on the same split, which keeps both page IDs and generated template families together.
+The test results use the same split, which keeps both page IDs and generated template families together. The OOD columns were cheaply refreshed from the two saved deployment artifacts without retraining.
 
-| Model | Test Macro-F1 | Test Accuracy | OOD-dev Macro-F1 | Size |
-| :--- | :---: | :---: | :---: | :---: |
-| **DistilBERT (fine-tuned)** | **0.883** | **0.911** | **0.697** | ~269 MB |
-| Character TF-IDF + 12 features + SMOTE + calibrated LinearSVC | 0.730 | 0.816 | 0.517 | ~4.4 MB |
-| LSTM (from scratch) | 0.657 | 0.784 | 0.389 | ~5 MB |
+| Model | Test Macro-F1 | Test Accuracy | OOD-dev Macro-F1 | OOD-dev Accuracy | Size |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **DistilBERT (fine-tuned)** | **0.883** | **0.911** | 0.694 | 0.857 | ~269 MB |
+| Character TF-IDF + 12 features + SMOTE + calibrated LinearSVC | 0.730 | 0.816 | **0.752** | **0.893** | ~4.4 MB |
+| LSTM (from scratch) | 0.657 | 0.784 | — | — | ~5 MB |
 
 > [!NOTE]
-> These are the latest Notebook 3 rerun results on the shared 5,051/1,322 page-and-template-grouped split. The exported classical artifact's stored evaluation is 0.732 macro-F1, 0.825 accuracy, and 0.517 OOD-dev macro-F1.
+> The test columns are the latest Notebook 3 results on the shared 5,051/1,322 page-and-template-grouped split. The OOD columns use the saved classical and DistilBERT artifacts on the refreshed set. The LSTM was not saved or rerun on it. At the provisional 50% DistilBERT threshold, 27/28 rows are covered and 24/27 covered predictions are correct.
 
 ### Why a Leak-Free Split Matters
 
@@ -61,7 +61,7 @@ A naive random split reported a flattering **~0.96** macro-F1. On this corpus, *
 
 ### Why an Out-of-Distribution Test
 
-The 23 scraped Indian UI strings are useful diagnostics, but they cover only 8 classes, have no benign examples, and have already influenced development. They are therefore reported as **OOD development data**, not an independent final test.
+The 28 scraped Indian UI strings are useful diagnostics, but they cover only 9 classes, have no benign examples, and have already influenced development. Some OOD entries are from CCPA orders. They are therefore reported as **OOD development data**, not an independent final test.
 
 ---
 
@@ -153,7 +153,7 @@ dark-pattern-detector/
 │   └──  processed/
 │       ├── ccpa_dataset.tsv                # cleaned & remapped corpus
 │       ├── features.csv                    # final data after feature engineering
-│       └── ood_real_test.csv               # 23-string OOD development set
+│       └── ood_real_test.csv               # 28-string OOD development set
 │
 ├── models/
 │   ├── best_multi_model.joblib            # calibrated character/features/SMOTE pipeline
@@ -213,4 +213,4 @@ The notebook, saved feature table, training pipeline, and Streamlit app now shar
 
 ## ⚠️ Disclaimer
 > [!WARNING]
-> This text-only research screener does not establish compliance or a legal violation. Review the complete interface and user flow with qualified domain and legal experts.
+> This is a student project. I mapped the dataset labels to the CCPA dark-pattern categories based on my own reading of the guidelines. The mapping is not official or approved by the CCPA, and the results should not be used as legal or compliance advice.

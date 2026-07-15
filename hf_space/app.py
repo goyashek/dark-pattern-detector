@@ -190,8 +190,10 @@ with gr.Blocks(title="Dark Pattern Detector — DistilBERT", theme=gr.themes.Sof
             "weighed, not calibrated confidence. Any top score below the provisional "
             f"{int(ABSTAIN_THRESHOLD*100)}% display threshold is shown as *inconclusive*, "
             "never converted to benign.\n\n"
-            "*Research/educational risk screener — not a compliance verdict or legal advice. "
-            "Made by [Abhishek Goyal](https://github.com/goyashek).*"
+            "*This is a student project. I mapped the dataset labels to the CCPA dark-pattern "
+            "categories based on my own reading of the guidelines. The mapping is not official "
+            "or approved by the CCPA, and the results should not be used as legal or compliance "
+            "advice. Made by [Abhishek Goyal](https://github.com/goyashek).*"
         )
 
 if __name__ == "__main__":

@@ -303,7 +303,7 @@ def main():
     <div style="background-color: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <h3 style="margin-top: 0; color: #fca5a5; font-size: 1.0rem; font-family: 'Outfit', sans-serif;">⚠️ Legal Disclaimer</h3>
         <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 0;">
-            This text-only risk screener cannot establish compliance or a legal violation. Review the full interface and user flow with a qualified professional.
+            This is a <strong>student project</strong>. I mapped the dataset labels to the CCPA dark-pattern categories based on my own reading of the guidelines. The mapping is not official or approved by the CCPA, and the results should not be used as legal or compliance advice.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -492,7 +492,7 @@ def main():
         - **Repository Link**: [GitHub Profile](https://github.com/goyashek)
         
         #### ⚠️ Disclaimer
-        *This text-only research screener does not establish compliance or a legal violation. Review the complete interface and user flow with qualified domain and legal experts.*
+        *This is a student project. I mapped the dataset labels to the CCPA dark-pattern categories based on my own reading of the guidelines. The mapping is not official or approved by the CCPA, and the results should not be used as legal or compliance advice.*
         """)
 
 

@@ -40,6 +40,7 @@ converted to benign.
 
 ## Disclaimer
 
-Text-only research screener — not a compliance verdict or legal advice. Review the full
-interface and user flow before drawing a conclusion. Made by
+This is a student project. I mapped the dataset labels to the CCPA dark-pattern categories
+based on my own reading of the guidelines. The mapping is not official or approved by the
+CCPA, and the results should not be used as legal or compliance advice. Made by
 [Abhishek Goyal](https://github.com/goyashek).

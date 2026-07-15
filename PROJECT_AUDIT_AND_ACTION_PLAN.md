@@ -1,10 +1,131 @@
 # Dark Pattern Detector: Complete Project Audit and Plan of Action
 
-**Audit date:** 2026-07-15
-**Repository state:** `main` at `053a1b1`
+**Audit date:** 2026-07-16
+**Repository state:** `main` at `e715e08` with uncommitted session work
 **Scope:** product claims, regulatory framing, data, labeling, leakage, evaluation,
 modeling, inference, applications, dependencies, reproducibility, testing, deployment,
 security, accessibility, documentation, and repository hygiene.
+
+## Session 6 Completion Update — 2026-07-16
+
+This is the current handoff point and supersedes the Session 6 continuation list below.
+
+### Completed
+
+- Finished the A01 wording containment and immediate A02 symmetric-abstention work recorded
+  below. The 50% boundary remains a provisional display rule, not a calibrated threshold.
+- Completed the technical A10 mapping audit. By user direction, the project keeps its legacy
+  mapping with a student-project, non-official disclaimer instead of starting bulk relabeling.
+- Reviewed the relevant CCPA orders and retained five selected UI examples with their screenshots.
+  The OOD development set is now 28 rows across 9 classes; it still has no benign rows and is not
+  an independent final test.
+- Regenerated `ood_features.csv` and cheaply evaluated the saved artifacts without retraining:
+  classical macro-F1 `0.752`, accuracy `0.893`; DistilBERT macro-F1 `0.694`, accuracy `0.857`.
+  At the provisional 50% DistilBERT threshold, coverage is `27/28` and covered accuracy is
+  `24/27`.
+- Refreshed the Notebook 2/3 OOD cells and saved outputs. The LSTM OOD result is intentionally
+  blank because its model was not saved or rerun on the expanded set.
+
+### Start here next
+
+1. Start **A11** by adding provenance and evidence fields to the OOD/data workflow while keeping
+   the current labels unchanged. Record source/order, screenshot or page evidence, candidate
+   label, evidence status, review status, reviewer, and notes.
+2. Then begin **A12** as a separate adjudicated benchmark. Do not promote the current OOD
+   development rows into a final test set and do not tune further against them.
+3. **A03/A05 and the A10 bulk label review remain skipped** unless the user asks to resume them.
+4. Expand **A09** only if requested.
+
+## A10 Technical Taxonomy Audit — 2026-07-15
+
+This is a read-only label audit against the official CCPA materials. No labels, datasets,
+models, or stored results were changed. **A10 is technically audited but not complete:** its
+acceptance criterion requires a qualified domain reviewer to approve the taxonomy and evidence
+rules. A03/A05 were explicitly skipped for this continuation.
+
+### Current remap inventory
+
+The final 6,373-row dataset contains 2,157 retained raw/remapped rows and 4,216 generated rows.
+The older 4,217 generated-row statement describes `collected.tsv`; one generated Confirm
+Shaming row duplicates a raw Misdirection row and is removed when the final dataset is built.
+
+| Academic source category | Current target | Retained rows | Audit result |
+|---|---|---:|---|
+| Not Dark Pattern | Not a Dark Pattern | 1,155 | Absence of a source label cannot establish that a complete UI flow is benign |
+| Urgency + Scarcity | False Urgency | 493 | Text shows urgency/scarcity, but the required falsity is not verified |
+| Social Proof | Disguised Advertisement | 309 | Unsupported; none contains an ad-disclosure marker and the source label is not about advertising |
+| Misdirection | Confirm Shaming | 75 | Often plausible from wording, but still unadjudicated |
+| Misdirection | Trick Question | 21 | Keyword heuristic is invalid; 12 are selected only because they contain `?` |
+| Misdirection | Interface Interference | 61 | Cannot be established without visual/layout evidence; several rows are obvious shaming or consent wording |
+| Obstruction | Subscription Trap | 25 | A mention of cancellation, billing, or membership does not prove a complex or hidden cancellation flow |
+| Obstruction | Interface Interference | 2 | No visual evidence is retained |
+| Sneaking | Drip Pricing | 6 | Fee words alone do not establish when or how the price was disclosed |
+| Sneaking | Basket Sneaking | 6 | Text alone does not establish automatic addition or lack of consent |
+| Forced Action | Forced Action | 4 | Closest category, but the blocked user goal is not retained as evidence |
+
+All 1,002 raw-origin positive rows are therefore heuristic or inherited labels rather than
+adjudicated CCPA ground truth.
+
+### Material findings
+
+1. **Social Proof is mapped to the wrong legal concept.** The Gazette definition of False
+   Urgency expressly includes false popularity, while Disguised Advertisement requires an ad
+   masked as another kind of content. The 309 retained Social Proof rows contain purchase,
+   viewing, cart, or popularity claims and zero matches for `sponsor`, `advert`, `promoted`,
+   `paid partnership`, or `affiliate`. They must not remain Disguised Advertisement. They also
+   cannot automatically become False Urgency because the dataset does not establish that the
+   popularity claims are false.
+2. **Punctuation is acting as legal evidence.** The Misdirection rule sends any row containing
+   `?`, `yes,`, `no,`, `opt-in`, `uncheck`, or `pre-checked` to Trick Question. This places
+   ordinary upsell questions and confirm-shaming refusals in the class without proving confusing
+   or vague choice wording.
+3. **Visual and temporal categories are inferred from isolated text.** Interface Interference,
+   Basket Sneaking, Drip Pricing, Nagging, Bait and Switch, Subscription Trap, SaaS Billing, and
+   Rogue Malware all require layout, consent, repetition, before/after, billing, or system-state
+   evidence absent from the four-column dataset.
+4. **Normal disclosures can become positive labels.** Several Obstruction rows state that a user
+   may cancel at any time, and several Sneaking rows list delivery, tax, or service charges. The
+   official Basket Sneaking definition specifically excludes necessary fees disclosed at the
+   time of purchase.
+5. **Official naming is inconsistent.** The binding 2023 Gazette Annexure and a June 2026 CCPA
+   enforcement release use `Trick Question`; 2023-2025 PIB summaries use `Trick Wording`. A
+   canonical taxonomy should keep one stable ID and record both official aliases rather than
+   treating either phrase as a different model class.
+6. **Generated targets are not adjudicated evidence.** The 4,216 generated rows receive their
+   class from the generator that created them. Four served classes have no retained raw-origin
+   rows at all. Generated rows may support training experiments, but they cannot validate the
+   legal taxonomy or appear in a release benchmark.
+
+### Draft evidence rules for domain approval
+
+| Category | Minimum evidence beyond an isolated snippet |
+|---|---|
+| False Urgency | Inventory, timer, demand, or offer-expiry verification showing the claim is false |
+| Basket Sneaking | Cart state before/after the user's choice plus explicit-consent evidence |
+| Confirm Shaming | Full choice wording and the action each option causes |
+| Forced Action | Intended user goal, extra required action, and proof the goal is blocked |
+| Subscription Trap | Signup, billing authorization, cancellation steps, and their actual availability |
+| Interface Interference | Screenshot/layout, visual prominence, defaults, and control behavior |
+| Bait and Switch | Original offer/action and the different outcome actually served |
+| Drip Pricing | Price timeline from first display through payment and disclosure timing |
+| Disguised Advertisement | Advertising status, surrounding presentation, and disclosure visibility |
+| Nagging | Repeated-event history, timing, user permission, and dismissal behavior |
+| Trick Question / Wording | Complete prompt, choices, defaults, and effect of each response |
+| SaaS Billing | Trial and renewal terms, notice history, authorization, and actual charges |
+| Rogue Malware | Device state, prompt source, requested payment/download, and payload behavior |
+| No textual signal | Full flow review; this outcome must never be presented as proof of compliance |
+
+### Required next decision
+
+Do not bulk-relabel the current file. Preserve the existing target as `legacy_label`, retain the
+academic `source_category`, and send the 1,002 raw-origin positive rows through an evidence-aware
+review with `candidate_label`, `evidence_status`, `review_status`, and an explicit
+`insufficient_context` outcome. The first review batch should be the 309 Social Proof rows because
+their current Disguised Advertisement mapping is categorically unsupported.
+
+The user chose not to start that review. The current project will keep the legacy mapping and add
+a clear student-project disclaimer stating that the mapping reflects the author's own reading of
+the guidelines and is not official or CCPA-approved.
 
 ## Session 6 Continuation Update — 2026-07-15
 
@@ -16,8 +137,9 @@ This is the current handoff point and supersedes the previous "Start here next s
   "potential textual signal," "no textual signal found," or "inconclusive" rather than
   declaring a CCPA violation or safe/compliant result.
 - Replaced the invented numbered "clauses" with category descriptions and category-specific
-  context needed for human review. The official display name "Trick Wording" is shown while
-  retaining "Trick Question" as the unchanged trained-model label.
+  context needed for human review. The current UI shows the government-summary alias "Trick
+  Wording" while retaining "Trick Question" as the unchanged trained-model label; the A10 audit
+  above records the inconsistent official naming.
 - Completed the immediate **A02** containment work. The HF Space no longer converts a weak dark
   prediction to benign. Any top-class softmax score below the provisional 50% display threshold
   abstains symmetrically, including when the leading class is benign. The full distribution is
@@ -36,11 +158,13 @@ This is the current handoff point and supersedes the previous "Start here next s
 
 ### Start here next
 
-1. Complete **A03/A05**: add an artifact manifest and exact tested environment/revision metadata,
-   including the newly rerun DistilBERT artifact.
-2. Address **A10-A12**: validate taxonomy mapping and provenance, then plan a real adjudicated
+1. **A03/A05 were skipped by user direction.** Do not start them unless requested later.
+2. The **A10 technical audit is complete**; obtain domain approval before changing labels. If
+   approved, review the 309 Social Proof rows first and preserve every old label as evidence.
+3. Then address **A11/A12**: add provenance/evidence fields and collect a real adjudicated
    benchmark that excludes generated rows from validation/test.
-3. Expand **A09**: add CI, artifact-load/golden-prediction checks, and app smoke tests.
+4. Expand **A09** only if requested: add CI, artifact-load/golden-prediction checks, and app
+   smoke tests.
 
 ## Session 5 Completion Update — 2026-07-15
 
