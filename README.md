@@ -15,7 +15,7 @@
 A compliance auditing tool that reads website/application UI text copy (e.g., urgency flags, pre-checked opt-ins, confirm-shaming prompts) and classifies it into one of **14 categories**—India's **13 illegal dark-pattern classes** established by the **Central Consumer Protection Authority (CCPA) in November 2023** plus a *Not a Dark Pattern* (safe/benign) class.
 
 > [!NOTE]
-> **Two live demos**: the fast, interpretable **classical** model on [dark-patterns.streamlit.app](https://dark-patterns.streamlit.app/), and the higher-accuracy **fine-tuned DistilBERT** on [its Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern). The tradeoff between them is the heart of this project.
+> **Two live demos**: the compact **classical** model on [dark-patterns.streamlit.app](https://dark-patterns.streamlit.app/), and the **fine-tuned DistilBERT** on [its Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern).
 
 ---
 
@@ -37,32 +37,31 @@ This project maps the academic baseline corpus (**Yada et al. 2022**) onto CCPA 
 | **Label Space** | Binary + 7 Academic Taxonomy Classes | **14 Classes** (13 CCPA Legal Classes + Benign) |
 | **Practical Context** | Academic Research | **Regulatory Compliance & Auditing** |
 | **Class Coverage** | Missing legal categories, high class skew | **All 13 CCPA classes represented** |
-| **Explainability** | Black-box Transformer predictions | **Both offered**: an interpretable classical model (lexical badge triggers) *and* a fine-tuned DistilBERT |
-| **Inference Layer** | Raw uncalibrated model outputs | **Precision-gate thresholding + Toned-down UI confidence** |
+| **Explainability** | Black-box Transformer predictions | **Both offered**: separate lexical signal badges with the classical model and a fine-tuned DistilBERT |
+| **Inference Layer** | Raw uncalibrated model outputs | **Grouped sigmoid calibration** |
 
 ---
 
 ## ⚖️ The Core Tradeoff: Interpretable Classical vs. Fine-Tuned Transformer
 
-The headline of this project isn't a single "best" score — it's an **honest tradeoff**. We took the same problem up a ladder of models and evaluated all of them on one **leak-free split** plus a held-out set of **23 real-world Indian UI strings** (out-of-distribution / OOD).
+All three models have now been rerun on the same split, which keeps both page IDs and generated template families together.
 
-| Model | Test Macro-F1 | OOD Macro-F1 | Size | Interpretability |
-| :--- | :---: | :---: | :---: | :--- |
-| **DistilBERT** (fine-tuned) | **0.869** | **0.778** | ~269 MB | Low — 66M opaque params |
-| Classical (Linear SVC) | 0.576 | 0.518 | ~2 MB | **High** — per-feature weights |
-| Classical (XGBoost) | 0.562 | 0.302 | ~2 MB | **High** — feature importances |
-| LSTM (from scratch) | 0.559 | 0.385 | ~5 MB | Low — learned embeddings |
+| Model | Test Macro-F1 | Test Accuracy | OOD-dev Macro-F1 | Size |
+| :--- | :---: | :---: | :---: | :---: |
+| **DistilBERT (fine-tuned)** | **0.883** | **0.911** | **0.697** | ~269 MB |
+| Character TF-IDF + 12 features + SMOTE + calibrated LinearSVC | 0.730 | 0.816 | 0.517 | ~4.4 MB |
+| LSTM (from scratch) | 0.657 | 0.784 | 0.389 | ~5 MB |
 
 > [!NOTE]
-> **Read it as a tradeoff, not a leaderboard.** DistilBERT is far and away the most accurate, and the only model that holds up on genuinely new text (OOD 0.778 vs ~0.52 for the best classical) — but it is ~100× larger and you cannot point to *why* it fired. The classical model gives up a lot of accuracy on the hard, context-dependent classes but is tiny, instant, and every decision traces back to a keyword or feature. **So we ship classical as the fast, explainable default (Streamlit) and offer DistilBERT for the hard cases (Hugging Face Space).** The wide gap is itself the finding: on short UI strings, understanding *phrasing* beats counting keywords.
+> These are the latest Notebook 3 rerun results on the shared 5,051/1,322 page-and-template-grouped split. The exported classical artifact's stored evaluation is 0.732 macro-F1, 0.825 accuracy, and 0.517 OOD-dev macro-F1.
 
 ### Why a Leak-Free Split Matters
 
-A naive random split reported a flattering **~0.96** macro-F1. But many UI strings are **near-duplicates** (same wording, different brand or price) — on this corpus **64.8%** of a naive test set has a template twin sitting in train, so the model peeks at the answer. Re-splitting by **normalized skeleton** (so no sibling group spans the split) dropped the honest classical score to **~0.56**. That ~0.40 gap is the difference between a number that looks good and a number you can trust.
+A naive random split reported a flattering **~0.96** macro-F1. On this corpus, **64.8%** of a naive test set has a template twin in training. The current split joins rows transitively by either normalized skeleton or source `page_id`, then keeps each connected group on one side. The latest Notebook 3 classical refit scores **0.730 macro-F1** on that 1,322-row source-clean test.
 
 ### Why an Out-of-Distribution Test
 
-In-distribution scores still flatter every model. The strongest honesty check is the **23 real Indian UI strings** scraped from live sites and kept entirely out of training. Scores there are lower for *everyone* — what matters is that the **ranking holds**, and that the transformer's edge survives contact with genuinely new text.
+The 23 scraped Indian UI strings are useful diagnostics, but they cover only 8 classes, have no benign examples, and have already influenced development. They are therefore reported as **OOD development data**, not an independent final test.
 
 ---
 
@@ -75,10 +74,10 @@ flowchart LR
     C["Supplementary<br/>UI-text Corpus"] --> D["Dataset Merge"]
     B --> D
 
-    D --> E["NLP Features + TF-IDF"]
-    E --> F["Leak-Free Split<br/>(skeleton-aware)"]
+    D --> E["Raw UI Text"]
+    E --> F["Leak-Free Split<br/>(page + skeleton groups)"]
 
-    F --> G["Classical<br/>(SVC / XGBoost)"]
+    F --> G["Character TF-IDF + 12 features<br/>SMOTE + LinearSVC"]
     F --> H["LSTM<br/>(from scratch)"]
     F --> I["Fine-Tuned<br/>DistilBERT"]
 
@@ -95,25 +94,43 @@ flowchart LR
 
 ### 1. Global De-duplication — and Why It Wasn't Enough
 * **Why**: Removing identical UI strings before splitting is the first defense against train/test leakage.
-* **The catch we found**: exact-match dedup misses **near-duplicates** (same skeleton, different brand/price). A dedicated leak audit re-split the data by **normalized skeleton** so no sibling group spans the split — which is what turned the flattering ~0.96 into the honest ~0.56 (see the tradeoff section above).
+* **The catch we found**: exact-match dedup misses **near-duplicates** and related strings from the same page. The current leak audit groups by both normalized skeleton and `page_id`; the refreshed classical model scores 0.732 on that split.
 
-### 2. SMOTE Oversampling Inside Cross-Validation Folds
-* **Why**: Solves class imbalance for rare classes (like *Subscription Trap*) without leaking validation partition data into the training process.
+### 2. Page + Template Grouping
+* **Why**: A page can contain several related strings, while generated rows can share a template. Connected-component groups prevent either relationship from crossing a fold or the final split.
 
-### 3. Robust Scaling and Power Transformation (Yeo-Johnson)
-* **Why**: Normalizes feature distributions and dampens outliers for highly skewed metrics (like capitalization ratios and text lengths).
+### 3. Character TF-IDF + 12 Focused Features
+* **Why**: Character 2-6 grams preserve short fragments, punctuation, prices, and spelling variants. Eight keyword signals plus exclamation, question, number, and time flags retain the most relevant engineered context without the full 22-feature block.
 
-### 4. Cross-Validated Macro-F1 Optimization via Optuna
-* **Why**: Forces the hyperparameter search to weight minority classes equally, preventing class neglect that occurs when optimizing for simple accuracy.
+### 4. Small Grouped Model Search
+* **Why**: Three LinearSVC settings (`C` in 0.5/1/2) are compared with five-fold grouped macro-F1. The selected `C=0.5` model reached `0.739 ± 0.059` inside the training partition.
 
-### 5. Shared Feature Extraction Module
-* **Why**: Eliminates train-serve skew by ensuring text processing is performed identically in both training and production.
+### 5. Grouped Sigmoid Calibration
+* **Why**: LinearSVC supplies the decision boundary; grouped out-of-fold sigmoid calibration supplies `predict_proba` for the app without mixing page or template families.
 
-### 6. Inference-Time Precision Gate
-* **Why**: Minimizes false positives by defaulting predictions with low classifier confidence (< 65%) to "Not a Dark Pattern".
+### 6. Separate Signal Badges
+* **Why**: The Streamlit badges remain lightweight lexical cues. They are shown separately and are not presented as the classifier's exact reasoning.
 
-### 7. UI Confidence Calibration
-* **Why**: Tones down overconfident probability scores (99%+) in the Streamlit interface to display realistic compliance scores.
+### What happened to the old advanced pipeline?
+
+I reran its components with the same five page/template-grouped training folds used for the new
+model. This is an ablation, not a comparison on the final test.
+
+| Training-only variant | Grouped CV Macro-F1 |
+| :--- | :---: |
+| Character TF-IDF + class-weighted LinearSVC | **0.776 ± 0.030** |
+| Character TF-IDF + 12 engineered features | 0.739 ± 0.046 |
+| Character TF-IDF + engineered features + SMOTE | 0.739 ± 0.050 |
+| **Deployed: character TF-IDF + 12 features + SMOTE** | **0.739 ± 0.059** |
+| Legacy word TF-IDF + engineered features + SMOTE + SVC | 0.555 ± 0.034 |
+| Legacy word TF-IDF + engineered features + SMOTE + XGBoost | 0.559 ± 0.034 |
+
+The engineered-feature variant initially hit LinearSVC's iteration limit; raising it to 5,000
+iterations converged at the same 0.739 result. A fresh grouped Optuna check for XGBoost completed
+three trials at 0.566, 0.576, and 0.549 before I stopped it:
+the best result was still 0.200 below the character model. SMOTE, scaling, feature engineering,
+XGBoost, and Optuna were therefore tested rather than silently discarded; they did not earn a
+place in the deployment pipeline under the corrected validation setup.
 
 ---
 
@@ -126,8 +143,8 @@ dark-pattern-detector/
 │
 ├── notebooks/
 │   ├── 01_data_nlp_eda.ipynb              # EDA, tokenization & keyword extraction
-│   ├── 02_model_tuning_export.ipynb       # cross-validation, optuna tuning & export
-│   └── 03_deep_learning_transformer.ipynb # LSTM + DistilBERT on the leak-free split + OOD
+│   ├── 02_model_tuning_export.ipynb       # self-contained classical tuning and export
+│   └── 03_deep_learning_transformer.ipynb # current classical, LSTM and DistilBERT comparison
 │
 ├── data/
 │   ├─ raw/
@@ -136,11 +153,11 @@ dark-pattern-detector/
 │   └──  processed/
 │       ├── ccpa_dataset.tsv                # cleaned & remapped corpus
 │       ├── features.csv                    # final data after feature engineering
-│       └── ood_real_test.csv               # 23 real Indian UI strings (held-out OOD)
+│       └── ood_real_test.csv               # 23-string OOD development set
 │
 ├── models/
-│   ├── best_multi_model.joblib            # tuned classical model
-│   ├── best_binary_model.joblib           # benign model
+│   ├── best_multi_model.joblib            # calibrated character/features/SMOTE pipeline
+│   ├── best_binary_model.joblib           # legacy artifact, not used by the app
 │   └── label_encoder.joblib               # target class encoder
 │                                          # (DistilBERT weights live on the HF Model repo)
 │
@@ -160,13 +177,16 @@ dark-pattern-detector/
 pip install -r requirements.txt
 ```
 
-### Reproduce the Modeling Pipeline
-Run Jupyter Notebooks:
+### Reproduce the Notebooks
 ```bash
-jupyter notebook notebooks/01_data_nlp_eda.ipynb               # data + 22 NLP features
-jupyter notebook notebooks/02_model_tuning_export.ipynb        # classical tuning & export
-jupyter notebook notebooks/03_deep_learning_transformer.ipynb  # LSTM + DistilBERT, leak-free + OOD eval
+jupyter notebook notebooks/01_data_nlp_eda.ipynb
+jupyter notebook notebooks/02_model_tuning_export.ipynb
+jupyter notebook notebooks/03_deep_learning_transformer.ipynb
 ```
+
+The notebooks contain their preprocessing and model code directly. Set `RUN_TRAINING=True` in
+Notebook 2 to replace the classical artifact, and `RUN_BERT=True` in Notebook 3 for the full
+transformer rerun.
 
 ### Launch the Dashboards
 ```bash
@@ -176,11 +196,11 @@ The fine-tuned **DistilBERT** demo runs as a [Hugging Face Space](https://huggin
 
 ---
 
-## 🔬 The 22 Engineered NLP Features
-- **Lexical/Keyword Triggers**: urge_kw_count, scarcity_kw_count, shame_phrase_flag, cancel_diff_score, social_proof_flag, price_drip_flag, discount_claim_flag, neg_option_flag.
-- **Structural Indicators**: all_caps_ratio, exclamation_count, question_count, text_length, word_count, number_present, time_reference_flag.
-- **Part-of-Speech (POS) Mix**: noun_ratio, verb_ratio, adj_ratio, adv_ratio.
-- **TextBlob Sentiment**: sentiment_polarity, sentiment_subjectivity, and average_word_length.
+## 🔬 The 12 Engineered Features
+
+The notebook, saved feature table, training pipeline, and Streamlit app now share the same compact feature contract.
+- **Lexical/Keyword Triggers**: urgency_kw_count, scarcity_kw_count, shame_phrase_flag, cancel_diff_score, social_proof_flag, price_drip_flag, discount_claim_flag, neg_option_flag.
+- **Structural Indicators**: exclamation_count, question_count, number_present, time_reference_flag.
 
 ---
 
@@ -194,5 +214,3 @@ The fine-tuned **DistilBERT** demo runs as a [Hugging Face Space](https://huggin
 ## ⚠️ Disclaimer
 > [!WARNING]
 > This is a **test demonstration project** and does not constitute formal legal advice. Always consult a legal professional for compliance validation.
-
-

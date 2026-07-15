@@ -37,22 +37,20 @@ def map_to_ccpa(cat, text):
     if cat == "Social Proof":
         return "Disguised Advertisement"
     if cat == "Misdirection":
-        if any(p in text for p in ["no thanks", "i don't want", "no, thanks", "prefer to pay",
-                                   "hate saving", "dont want", "i prefer", "no i hate",
-                                   "no, i hate", "no, i prefer"]):
+        if any(p in text for p in ["no thanks", "i don't want", "prefer to pay",
+                                   "hate saving", "i prefer"]):
             return "Confirm Shaming"
-        if any(p in text for p in ["?", "yes,", "no,", "agree to", "opt-in", "opt in",
-                                   "uncheck", "pre-checked"]):
+        if any(p in text for p in ["?", "yes,", "no,", "opt-in", "uncheck", "pre-checked"]):
             return "Trick Question"
         return "Interface Interference"
     if cat == "Obstruction":
         if any(p in text for p in ["cancel", "membership", "subscription", "renew", "bill",
-                                   "stop", "recurring", "hotline", "phone", "fee"]):
+                                   "fee", "hotline"]):
             return "Subscription Trap"
         return "Interface Interference"
     if cat == "Sneaking":
-        if any(p in text for p in ["insurance", "fee", "charge", "tax", "cost", "extra",
-                                   "surcharge", "drip", "processing", "booking"]):
+        if any(p in text for p in ["fee", "charge", "tax", "cost", "surcharge",
+                                   "processing", "booking"]):
             return "Drip Pricing"
         return "Basket Sneaking"
     if cat == "Forced Action":

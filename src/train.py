@@ -1,250 +1,201 @@
-"""
-train.py — Leakage-safe training, tuning and honest evaluation (Route 1: classical ML).
+"""Train the classical dark-pattern classifier with source-aware validation.
 
-Methodology fixes vs. the original project:
-  * The held-out TEST set is the TEMPLATE-AWARE leak-free split from src/leak_audit.py
-    (reports/leak_free_split.json), NOT a random split. Global dedup removes only exact
-    duplicates; the corpus is heavily templated, so a random split lets sibling rows of
-    the same skeleton (differing only by brand/price) straddle train and test -> ~65% of
-    a naive test set has a train twin, inflating macro-F1 to ~0.96. The skeleton-grouped
-    split is what makes the reported number honest (~0.63).
-  * A staleness guard asserts the split indices fit the current features.csv, so a stale
-    split can never again be silently paired with regenerated features.
-  * 5 classical models compared with Stratified 5-fold CV; SMOTE is fit INSIDE each
-    fold (via imblearn Pipeline) so no synthetic minority sample leaks into validation.
-  * Optuna tunes XGBoost using CROSS-VALIDATION macro-F1 on the training split only
-    (the original tuned against the test set -> optimistic + leaky).
-  * Final tuned model is evaluated ONCE on the untouched test set; we save the
-    classification report, confusion matrix and model-comparison table.
+The model combines character TF-IDF with 12 lexical/structural features, SMOTE and
+LinearSVC. Model selection uses connected page/template groups on the training
+partition only. The selected classifier is then sigmoid-calibrated on grouped folds.
 
-Run:  python -m src.train
+Run: python -m src.train
 """
 
-import os
 import json
-import warnings
+import os
 
 import joblib
 import numpy as np
 import pandas as pd
-import optuna
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import RobustScaler, PowerTransformer, MinMaxScaler, LabelEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
+from sklearn.model_selection import StratifiedGroupKFold, cross_val_score
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import LabelEncoder, PowerTransformer, RobustScaler
 from sklearn.svm import LinearSVC
-from sklearn.naive_bayes import ComplementNB
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, f1_score, classification_report,
-                             confusion_matrix)
-from xgboost import XGBClassifier
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 
-from src import features as F
-
-warnings.filterwarnings("ignore")
-optuna.logging.set_verbosity(optuna.logging.WARNING)
+from src.features import NUM_COLS as MODEL_NUM_COLS
+from src.leak_audit import connected_groups, dataset_hash
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEAT_PATH = os.path.join(HERE, "data", "processed", "features.csv")
+OOD_PATH = os.path.join(HERE, "data", "processed", "ood_features.csv")
 SPLIT_PATH = os.path.join(HERE, "reports", "leak_free_split.json")
 MODELS_DIR = os.path.join(HERE, "models")
 REPORTS_DIR = os.path.join(HERE, "reports")
 RANDOM_STATE = 42
-
-
-def load_leakfree_split(n_rows):
-    """Load the template-aware split written by src.leak_audit and verify it matches
-    the current features.csv. The staleness guard is the whole point: the honest number
-    is only honest if these indices index THIS dataframe. If features.csv was regenerated
-    (e.g. after refreshing the corpus) without re-running the audit, the indices go stale
-    and silently pair a 4391-row split with a 6373-row frame — exactly the bug this fixes.
-    """
+def load_leakfree_split(df):
     if not os.path.exists(SPLIT_PATH):
-        raise SystemExit(
-            f"Leak-free split not found: {SPLIT_PATH}\n"
-            "Run `python -m src.make_features && python -m src.leak_audit` first.")
-    split = json.load(open(SPLIT_PATH))
-    tr, te = split["train"], split["test"]
-    covered = len(tr) + len(te)
-    max_idx = max(max(tr), max(te))
-    if covered != n_rows or max_idx != n_rows - 1:
-        raise SystemExit(
-            f"STALE SPLIT: leak_free_split.json covers {covered} rows (max index {max_idx}) "
-            f"but features.csv has {n_rows} rows.\n"
-            "The split and features are out of sync. Re-run `python -m src.leak_audit` "
-            "against the current features.csv before training.")
-    return tr, te
+        raise SystemExit(f"Missing {SPLIT_PATH}; run `python -m src.leak_audit` first.")
+
+    with open(SPLIT_PATH) as fh:
+        split = json.load(fh)
+    train = np.asarray(split["train"], dtype=int)
+    test = np.asarray(split["test"], dtype=int)
+    expected = set(range(len(df)))
+
+    if set(train) & set(test) or set(train) | set(test) != expected:
+        raise SystemExit("Invalid split: indices must be unique, disjoint, and cover every row.")
+    if split.get("dataset_sha256") != dataset_hash(df):
+        raise SystemExit("Stale split: dataset hash differs; rerun `python -m src.leak_audit`.")
+
+    groups = connected_groups(df)
+    if set(groups[train]) & set(groups[test]):
+        raise SystemExit("Leaky split: a page/template group appears in both train and test.")
+    return train, test, groups
 
 
-def make_preprocessor(scaler):
-    return ColumnTransformer(transformers=[
-        ("text_tfidf", TfidfVectorizer(max_features=300, ngram_range=(1, 2),
-                                       min_df=2, sublinear_tf=True), "clean_text"),
-        ("num", scaler, F.NUM_COLS),
+def make_model(c=1.0):
+    preprocessor = ColumnTransformer([
+        ("text", TfidfVectorizer(
+            analyzer="char_wb", ngram_range=(2, 6), min_df=2,
+            max_features=30_000, sublinear_tf=True,
+        ), "text"),
+        ("numeric", Pipeline([
+            ("scale", RobustScaler()),
+            ("power", PowerTransformer(method="yeo-johnson")),
+        ]), MODEL_NUM_COLS),
+    ])
+    return ImbPipeline([
+        ("prep", preprocessor),
+        ("smote", SMOTE(random_state=RANDOM_STATE)),
+        ("clf", LinearSVC(
+            C=c, random_state=RANDOM_STATE, max_iter=2_000, tol=1e-3,
+        )),
     ])
 
 
-def std_numeric():
-    return Pipeline([("scaler", RobustScaler()),
-                     ("power", PowerTransformer(method="yeo-johnson"))])
+def grouped_folds(text, labels, groups, n_splits=5):
+    cv = StratifiedGroupKFold(
+        n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE,
+    )
+    folds = list(cv.split(text, labels, groups))
+    classes = set(labels)
+    if any(set(labels[train]) != classes or set(labels[test]) != classes for train, test in folds):
+        raise SystemExit("A grouped CV fold is missing a class; revise the grouping or fold count.")
+    return folds
+
+
+def calibrated_model(model, folds):
+    return CalibratedClassifierCV(model, method="sigmoid", cv=folds, ensemble=False)
 
 
 def main():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     os.makedirs(MODELS_DIR, exist_ok=True)
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
     df = pd.read_csv(FEAT_PATH)
-    df["clean_text"] = df["clean_text"].fillna("")
-    feature_cols = ["clean_text"] + F.NUM_COLS
-    X = df[feature_cols]
-    le = LabelEncoder()
-    y = le.fit_transform(df["Pattern Category"])
-    print(f"Loaded {len(df)} rows, {len(le.classes_)} classes.")
+    df["text"] = df["text"].fillna("")
+    data = df[["text"] + MODEL_NUM_COLS]
+    encoder = LabelEncoder()
+    labels = encoder.fit_transform(df["Pattern Category"])
+    train_idx, test_idx, groups = load_leakfree_split(df)
 
-    # ---- load the TEMPLATE-AWARE leak-free split (not a random one) ---------
-    tr_idx, te_idx = load_leakfree_split(len(df))
-    X_tr, X_te = X.iloc[tr_idx], X.iloc[te_idx]
-    y_tr, y_te = y[tr_idx], y[te_idx]
-    print(f"Train: {len(X_tr)}  Test (held-out, leak-free): {len(X_te)}")
+    x_train, x_test = data.iloc[train_idx], data.iloc[test_idx]
+    y_train, y_test = labels[train_idx], labels[test_idx]
+    train_groups = groups[train_idx]
+    folds = grouped_folds(x_train, y_train, train_groups)
+    print(f"Loaded {len(df)} rows: {len(train_idx)} train / {len(test_idx)} source-clean test")
 
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    rows = []
+    for c in (0.5, 1.0, 2.0):
+        scores = cross_val_score(
+            make_model(c), x_train, y_train,
+            cv=folds, scoring="f1_macro", n_jobs=-1,
+        )
+        row = {
+            "C": c,
+            "CV Macro-F1": float(scores.mean()),
+            "CV Std": float(scores.std()),
+        }
+        rows.append(row)
+        print(f"C={c:<3}: {scores.mean():.4f} +/- {scores.std():.4f}")
 
-    # ---- model zoo (SMOTE inside each fold via imblearn pipeline) ----------
-    models = {
-        "Logistic Regression": ImbPipeline([
-            ("prep", make_preprocessor(std_numeric())),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-            ("clf", LogisticRegression(max_iter=2000, class_weight="balanced",
-                                       random_state=RANDOM_STATE))]),
-        "Linear SVC": ImbPipeline([
-            ("prep", make_preprocessor(std_numeric())),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-            ("clf", LinearSVC(class_weight="balanced", random_state=RANDOM_STATE))]),
-        "Complement NB": ImbPipeline([
-            ("prep", make_preprocessor(MinMaxScaler())),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-            ("clf", ComplementNB())]),
-        "Random Forest": ImbPipeline([
-            ("prep", make_preprocessor(std_numeric())),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-            ("clf", RandomForestClassifier(n_estimators=300, class_weight="balanced_subsample",
-                                           random_state=RANDOM_STATE, n_jobs=-1))]),
-        "XGBoost": ImbPipeline([
-            ("prep", make_preprocessor(std_numeric())),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-            ("clf", XGBClassifier(eval_metric="mlogloss", random_state=RANDOM_STATE,
-                                  tree_method="hist"))]),
+    comparison = pd.DataFrame(rows).sort_values(
+        ["CV Macro-F1", "CV Std"], ascending=[False, True]
+    ).reset_index(drop=True)
+    comparison.to_csv(os.path.join(REPORTS_DIR, "cv_model_comparison.csv"), index=False)
+    winner = comparison.iloc[0]
+    params = {
+        "c": float(winner["C"]),
     }
 
-    print("\n=== 5-fold CV (macro-F1) on TRAIN split ===")
-    cv_rows = []
-    for name, pipe in models.items():
-        scores = cross_val_score(pipe, X_tr, y_tr, cv=cv, scoring="f1_macro", n_jobs=1)
-        cv_rows.append({"Model": name, "CV Macro-F1": scores.mean(), "CV Std": scores.std()})
-        print(f"  {name:22} macro-F1 = {scores.mean():.4f} +/- {scores.std():.4f}")
-    cv_df = pd.DataFrame(cv_rows).sort_values("CV Macro-F1", ascending=False)
-    cv_df.to_csv(os.path.join(REPORTS_DIR, "cv_model_comparison.csv"), index=False)
+    calibration_folds = grouped_folds(x_train, y_train, train_groups, n_splits=3)
+    selected = calibrated_model(make_model(**params), calibration_folds)
+    selected.fit(x_train, y_train)
+    predictions = selected.predict(x_test)
+    test_accuracy = accuracy_score(y_test, predictions)
+    test_f1 = f1_score(y_test, predictions, average="macro", zero_division=0)
+    print(f"Held-out test: accuracy={test_accuracy:.4f}, macro-F1={test_f1:.4f}")
 
-    # ---- Optuna tuning of XGBoost using CV macro-F1 on TRAIN only ----------
-    print("\n=== Optuna tuning XGBoost (CV macro-F1, train only) ===")
-
-    def objective(trial):
-        params = dict(
-            n_estimators=trial.suggest_int("n_estimators", 100, 400),
-            max_depth=trial.suggest_int("max_depth", 3, 10),
-            learning_rate=trial.suggest_float("learning_rate", 0.02, 0.3, log=True),
-            subsample=trial.suggest_float("subsample", 0.6, 1.0),
-            colsample_bytree=trial.suggest_float("colsample_bytree", 0.6, 1.0),
-            min_child_weight=trial.suggest_int("min_child_weight", 1, 8),
-        )
-        pipe = ImbPipeline([
-            ("prep", make_preprocessor(std_numeric())),
-            ("smote", SMOTE(random_state=RANDOM_STATE)),
-            ("clf", XGBClassifier(**params, eval_metric="mlogloss",
-                                  random_state=RANDOM_STATE, tree_method="hist"))])
-        return cross_val_score(pipe, X_tr, y_tr, cv=cv, scoring="f1_macro", n_jobs=1).mean()
-
-    study = optuna.create_study(direction="maximize",
-                                sampler=optuna.samplers.TPESampler(seed=RANDOM_STATE))
-    study.optimize(objective, n_trials=25, show_progress_bar=False)
-    print(f"  Best CV macro-F1: {study.best_value:.4f}")
-    print(f"  Best params: {study.best_params}")
-
-    # ---- fit tuned model on full TRAIN, evaluate ONCE on held-out TEST -----
-    best = ImbPipeline([
-        ("prep", make_preprocessor(std_numeric())),
-        ("smote", SMOTE(random_state=RANDOM_STATE)),
-        ("clf", XGBClassifier(**study.best_params, eval_metric="mlogloss",
-                              random_state=RANDOM_STATE, tree_method="hist"))])
-    best.fit(X_tr, y_tr)
-    pred = best.predict(X_te)
-    test_acc = accuracy_score(y_te, pred)
-    test_f1 = f1_score(y_te, pred, average="macro")
-    print(f"\n=== HELD-OUT TEST (tuned XGBoost) ===")
-    print(f"  Accuracy: {test_acc:.4f}   Macro-F1: {test_f1:.4f}")
-
-    report = classification_report(y_te, pred, target_names=le.classes_, zero_division=0)
-    print(report)
+    report = classification_report(
+        y_test, predictions, target_names=encoder.classes_, zero_division=0
+    )
     with open(os.path.join(REPORTS_DIR, "test_classification_report.txt"), "w") as fh:
-        fh.write(f"Held-out test accuracy: {test_acc:.4f}\n")
-        fh.write(f"Held-out test macro-F1: {test_f1:.4f}\n\n")
-        fh.write(report)
+        fh.write(f"Held-out test accuracy: {test_accuracy:.4f}\n")
+        fh.write(f"Held-out test macro-F1: {test_f1:.4f}\n\n{report}")
 
-    # confusion matrix plot
-    cm = confusion_matrix(y_te, pred)
+    matrix = confusion_matrix(y_test, predictions)
     fig, ax = plt.subplots(figsize=(11, 9))
-    im = ax.imshow(cm, cmap="viridis")
-    ax.set_xticks(range(len(le.classes_))); ax.set_yticks(range(len(le.classes_)))
-    ax.set_xticklabels(le.classes_, rotation=90, fontsize=7)
-    ax.set_yticklabels(le.classes_, fontsize=7)
-    ax.set_xlabel("Predicted"); ax.set_ylabel("True")
-    ax.set_title(f"Confusion Matrix — tuned XGBoost (test macro-F1={test_f1:.3f})")
-    fig.colorbar(im); fig.tight_layout()
+    image = ax.imshow(matrix, cmap="viridis")
+    ax.set_xticks(range(len(encoder.classes_)))
+    ax.set_yticks(range(len(encoder.classes_)))
+    ax.set_xticklabels(encoder.classes_, rotation=90, fontsize=7)
+    ax.set_yticklabels(encoder.classes_, fontsize=7)
+    ax.set(xlabel="Predicted", ylabel="True",
+           title=f"Character LinearSVC (test macro-F1={test_f1:.3f})")
+    fig.colorbar(image)
+    fig.tight_layout()
     fig.savefig(os.path.join(REPORTS_DIR, "confusion_matrix.png"), dpi=120)
     plt.close(fig)
 
-    # ---- binary violation model (held-out eval, SAME leak-free split) ------
-    yb = df["label"].astype(int).values
-    Xb_tr, Xb_te = X.iloc[tr_idx], X.iloc[te_idx]
-    yb_tr, yb_te = yb[tr_idx], yb[te_idx]
-    bin_pipe = ImbPipeline([
-        ("prep", make_preprocessor(std_numeric())),
-        ("smote", SMOTE(random_state=RANDOM_STATE)),
-        ("clf", XGBClassifier(n_estimators=300, max_depth=6, eval_metric="logloss",
-                              random_state=RANDOM_STATE, tree_method="hist"))])
-    bin_pipe.fit(Xb_tr, yb_tr)
-    bpred = bin_pipe.predict(Xb_te)
-    bin_report = classification_report(yb_te, bpred, zero_division=0)
-    print("=== Binary violation model (held-out test) ===")
-    print(bin_report)
-    with open(os.path.join(REPORTS_DIR, "binary_classification_report.txt"), "w") as fh:
-        fh.write(bin_report)
+    ood_f1 = None
+    if os.path.exists(OOD_PATH):
+        ood = pd.read_csv(OOD_PATH)
+        known = ood["Pattern Category"].isin(encoder.classes_)
+        ood_y = encoder.transform(ood.loc[known, "Pattern Category"])
+        ood_pred = selected.predict(ood.loc[known, ["text"] + MODEL_NUM_COLS])
+        ood_f1 = f1_score(ood_y, ood_pred, average="macro", zero_division=0)
+        print(f"OOD development set: macro-F1={ood_f1:.4f} ({known.sum()} rows)")
 
-    # ---- refit on ALL data for deployment & save --------------------------
-    best.fit(X, y)
-    bin_pipe.fit(X, yb)
-    joblib.dump(best, os.path.join(MODELS_DIR, "best_multi_model.joblib"))
-    joblib.dump(bin_pipe, os.path.join(MODELS_DIR, "best_binary_model.joblib"))
-    joblib.dump(le, os.path.join(MODELS_DIR, "label_encoder.joblib"))
+    # Refit the selected, calibrated pipeline on all rows for deployment.
+    deployment_folds = grouped_folds(data, labels, groups, n_splits=3)
+    deployment = calibrated_model(make_model(**params), deployment_folds)
+    deployment.fit(data, labels)
+    joblib.dump(deployment, os.path.join(MODELS_DIR, "best_multi_model.joblib"))
+    joblib.dump(encoder, os.path.join(MODELS_DIR, "label_encoder.joblib"))
+
+    metrics = {
+        "model": "character TF-IDF + 12 engineered features + SMOTE + calibrated LinearSVC",
+        "n_rows": int(len(df)),
+        "n_classes": int(len(encoder.classes_)),
+        "split_grouping": "connected_page_or_skeleton_v1",
+        "test_accuracy": float(test_accuracy),
+        "test_macro_f1": float(test_f1),
+        "ood_dev_macro_f1": None if ood_f1 is None else float(ood_f1),
+        "engineered_features": MODEL_NUM_COLS,
+        "best_params": {"C": params["c"], "ngram_range": [2, 6]},
+        "best_cv_macro_f1": float(winner["CV Macro-F1"]),
+        "best_cv_std": float(winner["CV Std"]),
+        "cv_comparison": comparison.to_dict(orient="records"),
+    }
     with open(os.path.join(REPORTS_DIR, "metrics_summary.json"), "w") as fh:
-        json.dump({
-            "n_rows": int(len(df)),
-            "n_classes": int(len(le.classes_)),
-            "test_accuracy": float(test_acc),
-            "test_macro_f1": float(test_f1),
-            "best_params": study.best_params,
-            "best_cv_macro_f1": float(study.best_value),
-            "cv_comparison": cv_df.to_dict(orient="records"),
-        }, fh, indent=2)
-    print("\nSaved models to models/ and reports to reports/.")
+        json.dump(metrics, fh, indent=2)
+    print("Saved calibrated model, label encoder, and reports.")
 
 
 if __name__ == "__main__":

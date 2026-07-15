@@ -12,46 +12,50 @@
       "to cancel your <slot> vip membership, call our hotline at <num>-<num>-<num>-<num>.": 53
     }
   },
+  "connected_source_groups": 1553,
   "naive_split": {
     "test_size": 1275,
     "cross_split_clusters": 225,
     "leaked_test_rows": 826,
-    "leaked_test_pct": 64.8
+    "leaked_test_pct": 64.8,
+    "cross_split_source_groups": 328,
+    "source_leaked_test_rows": 1063
   },
   "leak_free_split": {
-    "train_size": 5134,
-    "test_size": 1239,
+    "train_size": 5051,
+    "test_size": 1322,
     "cross_split_clusters": 0,
-    "leaked_test_rows": 0
+    "leaked_test_rows": 0,
+    "cross_split_skeletons": 0
   },
   "models": {
-    "svc": {
+    "legacy_svc": {
       "macro_f1_naive": 0.9473,
-      "macro_f1_leakfree": 0.577,
-      "macro_f1_drop": 0.3703,
-      "relative_pct": 39.1
+      "macro_f1_leakfree": 0.5147,
+      "macro_f1_drop": 0.4326,
+      "relative_pct": 45.7
     },
-    "xgb": {
+    "legacy_xgb": {
       "macro_f1_naive": 0.9631,
-      "macro_f1_leakfree": 0.527,
-      "macro_f1_drop": 0.436,
-      "relative_pct": 45.3
+      "macro_f1_leakfree": 0.6567,
+      "macro_f1_drop": 0.3064,
+      "relative_pct": 31.8
     }
   },
-  "headline_model": "xgb",
+  "headline_model": "legacy_xgb",
   "trivial_probes": {
     "currency_symbol": {
-      "macro_f1": 0.052914053901545674,
+      "macro_f1": 0.029452825693540713,
       "n_dollar_rows": 44,
       "n_rupee_rows": 1139
     },
     "text_length": {
-      "macro_f1": 0.13127297729332937
+      "macro_f1": 0.08813056365493108
     },
     "keyword_only": {
-      "macro_f1": 0.6138591622628263
+      "macro_f1": 0.5720146628827305
     }
   },
-  "pipeline": "TF-IDF 1-3gram x300 + 22 num feats -> SMOTE -> {clf}; tuned params from NB2 Optuna",
+  "pipeline": "legacy TF-IDF + 22 numeric features + SMOTE; current model is evaluated by src/train.py",
   "seed": 42
 }

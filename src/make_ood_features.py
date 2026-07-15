@@ -1,7 +1,7 @@
-"""make_ood_features.py — Precompute the 22 features for the OOD real-world test rows.
+"""make_ood_features.py — Precompute the 12 features for the OOD real-world test rows.
 
 Reads  data/processed/ood_real_test.csv   (raw real Indian UI strings + labels)
-Writes data/processed/ood_features.csv    (text + clean_text + 22 numeric features + labels)
+Writes data/processed/ood_features.csv    (text + clean_text + 12 numeric features + labels)
 
 Uses the SAME shared extractor as training (src/features.py), so the classical model sees
 identical inputs on OOD as it did in training — no train-serve skew. This is done here (not

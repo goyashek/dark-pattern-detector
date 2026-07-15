@@ -1,8 +1,7 @@
-"""
-Dark Pattern Detector — CCPA 2023 Compliance Tool (Route 1: classical NLP + core ML).
+"""Dark Pattern Detector — CCPA 2023 classical text model.
 
-This app imports feature logic from src/features.py — the SAME module used in training —
-so there is zero train/serve skew. Run from the project root:
+The classifier consumes character TF-IDF plus 12 engineered features through the exact
+pipeline saved by training.
 
     streamlit run app/app.py
 """
@@ -159,40 +158,11 @@ def get_samples_by_category():
 
 
 def predict(text, multi, le):
-    import numpy as np
-    row = F.build_feature_row(text)
-    X = pd.DataFrame([row])[["clean_text"] + F.NUM_COLS]
-    
-    classes = list(le.classes_)
-    not_dp_idx = classes.index("Not a Dark Pattern")
-    
-    conf = None
-    if hasattr(multi, "predict_proba"):
-        probs = multi.predict_proba(X)[0]
-        enc = int(probs.argmax())
-        raw_conf = float(probs[enc])
-        
-        # Precision improvement: default to "Not a Dark Pattern" if prediction is a weak dark pattern
-        threshold = 0.65
-        is_fallback = False
-        if enc != not_dp_idx and raw_conf < threshold:
-            enc = not_dp_idx
-            is_fallback = True
-            
-        label = le.inverse_transform([enc])[0]
-        
-        if is_fallback:
-            conf_val = 1.0 - raw_conf
-        else:
-            conf_val = float(probs[enc])
-            
-        # Tone down overconfidence: scale down high probability (e.g. 99%+ goes to ~80-85%)
-        conf = conf_val - 0.16 * (conf_val ** 2)
-    else:
-        enc = multi.predict(X)[0]
-        label = le.inverse_transform([enc])[0]
-        
-    return label, conf, row
+    features = F.extract_features(text)
+    model_input = pd.DataFrame([{"text": text, **features}])
+    probs = multi.predict_proba(model_input)[0]
+    encoded = int(probs.argmax())
+    return le.inverse_transform([encoded])[0], float(probs[encoded]), features
 
 
 def main():
@@ -323,7 +293,7 @@ def main():
         <h3 style="margin-top: 0; color: #f1f5f9; font-size: 1.1rem; font-family: 'Outfit', sans-serif;">⚙️ Classifier Info</h3>
         <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.4; margin-bottom: 0;">
             14-class detector mapping UI copy onto India's 13 CCPA dark-pattern types plus a benign class. 
-            Features: TF-IDF + 22 Engineered NLP Features.
+            Model: character TF-IDF + 12 engineered features + SMOTE + calibrated LinearSVC.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -448,14 +418,10 @@ def main():
                     triggers.append(("discount", "🏷️ Discount/offer claim"))
                 if feats.get("neg_option_flag", 0) > 0:
                     triggers.append(("neg", "☑️ Negative-option/pre-checked"))
-                if feats.get("all_caps_ratio", 0) > 0.3:
-                    triggers.append(("structure", f"🔠 HIGH CAPITALIZATION ({feats['all_caps_ratio']:.0%})"))
                 if feats.get("exclamation_count", 0) > 0:
                     triggers.append(("structure", f"❗ Exclamations ({feats['exclamation_count']})"))
                 if feats.get("time_reference_flag", 0) > 0:
                     triggers.append(("time", "⏰ Time reference"))
-                if abs(feats.get("sentiment_polarity", 0)) > 0.4:
-                    triggers.append(("sentiment", f"🎭 Strong sentiment ({feats['sentiment_polarity']:.2f})"))
                     
                 if triggers:
                     badge_html = '<div style="margin: -6px 0 16px 0;">'
@@ -491,14 +457,14 @@ def main():
         #### Key Objectives
         - **Promote User Autonomy**: Identify interface copy designed to trick, coerce, or manipulate consumers.
         - **Ensure Regulatory Compliance**: Check if website copy violates the CCPA guidelines.
-        - **Machine Learning Powered Audit**: Uses a hybrid approach combining NLP feature engineering and machine learning to analyze text snippets.
+        - **Machine Learning Powered Audit**: Uses a compact classical text classifier to analyze snippets.
         
         #### Technical Architecture
-        1. **Feature Extraction**: Generates 22 engineered lexical, structural, and part-of-speech (POS) tags from input copy.
-        2. **TF-IDF Vectorization**: Analyzes n-gram frequency to capture semantic context.
-        3. **SMOTE Balancing**: Restructures class representations to ensure minority dark pattern patterns are recognized.
-        4. **Optuna-Tuned XGBoost**: Classifies copy into one of 13 specific dark-pattern categories or a safe category.
-        5. **Precision & Overconfidence Calibration**: Damps high probabilities and filters out weak predictions to maximize precision.
+        1. **Character TF-IDF**: Keeps short phrases, punctuation, prices, and spelling variants.
+        2. **12 engineered features**: Adds focused lexical and structural signals.
+        3. **SMOTE + LinearSVC**: Balances the training fold and classifies into 14 categories.
+        4. **Grouped calibration**: Produces probabilities without mixing page/template groups.
+        5. **Direct output**: Shows the calibrated winning-class probability without a fallback threshold.
         
         #### The 13 CCPA Dark-Pattern Clauses
         """)

@@ -1,24 +1,24 @@
-text,Pattern Category,source,url,clean_text,urgency_kw_count,scarcity_kw_count,shame_phrase_flag,cancel_diff_score,social_proof_flag,price_drip_flag,discount_claim_flag,neg_option_flag,all_caps_ratio,exclamation_count,question_count,text_length,word_count,number_present,time_reference_flag,noun_ratio,verb_ratio,adj_ratio,adv_ratio,sentiment_polarity,sentiment_subjectivity,avg_word_len
-Only few left,False Urgency,flipkart,https://www.flipkart.com/search?q=wireless+earbuds,only few left,0,1,0,0,0,0,0,0,0.07692307692307693,0,0,13,3,0,0,0.0,0.3333333333333333,0.3333333333333333,0.3333333333333333,-0.06666666666666667,0.3666666666666667,3.6666666666666665
-Only 3 left,False Urgency,flipkart,https://www.flipkart.com/search?q=wireless+earbuds,only left,0,1,0,0,0,0,0,0,0.09090909090909091,0,0,11,3,1,0,0.0,0.3333333333333333,0.0,0.3333333333333333,0.0,0.5,3.0
-UNDER ARMOUR Icon Sportswear Woven Jacket Rs. 10999 Only Few Left!,False Urgency,myntra,https://www.myntra.com/sportswear,under armour icon sportswear woven jacket r only few left !,0,1,0,0,0,0,0,0,0.2878787878787879,1,0,66,11,1,0,0.23076923076923078,0.07692307692307693,0.23076923076923078,0.15384615384615385,-0.06666666666666667,0.3666666666666667,5.090909090909091
-Only 1 left in stock (more on the way).,False Urgency,amazon_in,https://www.amazon.in/s?k=power+bank,only left in stock more on the way,0,1,0,0,0,0,0,0,0.02564102564102564,0,0,39,9,1,0,0.16666666666666666,0.08333333333333333,0.0,0.16666666666666666,0.16666666666666666,0.5,3.4444444444444446
-Today's deals Sponsored,Disguised Advertisement,amazon_in,https://www.amazon.in/s?k=power+bank,today deal sponsored,0,0,0,0,0,0,1,0,0.08695652173913043,0,0,23,3,0,1,0.5,0.25,0.0,0.0,0.0,0.0,7.0
-Ends in 10:51:33,False Urgency,amazon_in,https://www.amazon.in/s?k=power+bank,end in,1,0,0,0,0,0,0,0,0.0625,0,0,16,3,1,0,0.3333333333333333,0.0,0.0,0.0,0.0,0.0,4.666666666666667
-Promoted,Disguised Advertisement,zomato,https://www.zomato.com/bangalore/delivery,promoted,0,0,0,0,0,0,0,0,0.125,0,0,8,1,0,0,0.0,1.0,0.0,0.0,0.0,0.0,8.0
-Download App,Nagging,blinkit,https://blinkit.com/,download app,0,0,0,0,0,0,0,0,0.16666666666666666,0,0,12,2,0,0,1.0,0.0,0.0,0.0,0.0,0.0,5.5
-Premium Standard ₹139 for 2 months ₹139/month after,SaaS Billing,spotify,https://www.spotify.com/in-en/premium/,premium standard for month month after,0,0,0,0,0,0,0,0,0.0392156862745098,0,0,51,8,1,1,0.375,0.0,0.125,0.125,0.0,0.0,5.5
-Premium Student ₹69 for 2 months ₹69/month after,SaaS Billing,spotify,https://www.spotify.com/in-en/premium/,premium student for month month after,0,0,0,0,0,0,0,0,0.041666666666666664,0,0,48,8,1,1,0.375,0.0,0.125,0.125,0.0,0.0,5.125
-Give to Underprivileged Musicians (₹1 per ticket),Basket Sneaking,bookmyshow,https://in.bookmyshow.com/order-summary/ET00491460/CPJI,give to underprivileged musician per ticket,0,0,0,0,0,0,0,0,0.061224489795918366,0,0,49,7,1,0,0.2222222222222222,0.1111111111111111,0.1111111111111111,0.0,0.0,0.0,6.142857142857143
-Convenience fees,Drip Pricing,bookmyshow,https://in.bookmyshow.com/order-summary/ET00491460/CPJI,convenience fee,0,0,0,0,0,1,0,0,0.0625,0,0,16,2,0,0,1.0,0.0,0.0,0.0,0.0,0.0,7.5
-This venue does not support booking cancellation.,Subscription Trap,bookmyshow,https://in.bookmyshow.com/order-summary/ET00491460/CPJI,this venue doe not support booking cancellation,0,0,0,0,0,0,0,0,0.02040816326530612,0,0,49,7,0,0,0.25,0.375,0.0,0.125,0.0,0.0,6.142857142857143
-Delivery charge,Drip Pricing,blinkit,https://blinkit.com/cart,delivery charge,0,0,0,0,0,0,0,0,0.06666666666666667,0,0,15,2,0,0,1.0,0.0,0.0,0.0,0.0,0.0,7.0
-Handling charge,Drip Pricing,blinkit,https://blinkit.com/cart,handling charge,0,0,0,0,0,0,0,0,0.06666666666666667,0,0,15,2,0,0,0.5,0.5,0.0,0.0,0.0,0.0,7.0
-Login to Proceed,Forced Action,blinkit,https://blinkit.com/cart,login to proceed,0,0,0,0,0,0,0,0,0.125,0,0,16,3,0,0,0.3333333333333333,0.3333333333333333,0.0,0.0,0.0,0.0,4.666666666666667
-Small cart charge,Drip Pricing,blinkit,https://blinkit.com/cart,small cart charge,0,0,0,0,0,0,0,0,0.058823529411764705,0,0,17,3,0,0,0.6666666666666666,0.0,0.3333333333333333,0.0,-0.25,0.4,5.0
-Feeding India donation ₹1,Basket Sneaking,blinkit,https://blinkit.com/cart,feeding india donation,0,0,0,0,0,0,0,0,0.08,0,0,25,4,1,0,0.5,0.25,0.25,0.0,0.0,0.0,5.5
-+₹86 Protect Promise Fee,Drip Pricing,flipkart,https://www.flipkart.com/hmd-vibe2-5g-peach-pink-128-gb/p/itm71c3ae6df2a26,protect promise fee,0,0,0,0,0,0,0,0,0.125,0,0,24,4,1,0,0.75,0.25,0.0,0.0,0.0,0.0,5.25
-Coupons Ends in 09h 41m 34s,False Urgency,flipkart,https://www.flipkart.com/hmd-vibe2-5g-peach-pink-128-gb/p/itm71c3ae6df2a26,coupon end in h m s,1,0,0,0,0,0,1,0,0.07407407407407407,0,0,27,6,1,0,0.16666666666666666,0.16666666666666666,0.0,0.0,0.0,0.0,3.6666666666666665
-Offer Handling Fee ₹99,Drip Pricing,flipkart,https://www.flipkart.com/payments,offer handling fee,0,0,0,0,0,1,1,0,0.13636363636363635,0,0,22,4,1,0,0.75,0.25,0.0,0.0,0.0,0.0,4.75
-Payment Handling Fee ₹39,Drip Pricing,flipkart,https://www.flipkart.com/payments,payment handling fee,0,0,0,0,0,1,0,0,0.125,0,0,24,4,1,0,0.75,0.25,0.0,0.0,0.0,0.0,5.25
-Pick up charge ₹199,Drip Pricing,reddit_flipkart,https://www.reddit.com/r/FuckFlipkart/comments/1nyvf2p/,pick up charge,0,0,0,0,0,0,0,0,0.05263157894736842,0,0,19,4,1,0,0.5,0.25,0.0,0.0,0.0,0.0,4.0
+text,Pattern Category,source,url,clean_text,urgency_kw_count,scarcity_kw_count,shame_phrase_flag,cancel_diff_score,social_proof_flag,price_drip_flag,discount_claim_flag,neg_option_flag,exclamation_count,question_count,number_present,time_reference_flag
+Only few left,False Urgency,flipkart,https://www.flipkart.com/search?q=wireless+earbuds,only few left,0,1,0,0,0,0,0,0,0,0,0,0
+Only 3 left,False Urgency,flipkart,https://www.flipkart.com/search?q=wireless+earbuds,only left,0,1,0,0,0,0,0,0,0,0,1,0
+UNDER ARMOUR Icon Sportswear Woven Jacket Rs. 10999 Only Few Left!,False Urgency,myntra,https://www.myntra.com/sportswear,under armour icon sportswear woven jacket r only few left !,0,1,0,0,0,0,0,0,1,0,1,0
+Only 1 left in stock (more on the way).,False Urgency,amazon_in,https://www.amazon.in/s?k=power+bank,only left in stock more on the way,0,1,0,0,0,0,0,0,0,0,1,0
+Today's deals Sponsored,Disguised Advertisement,amazon_in,https://www.amazon.in/s?k=power+bank,today deal sponsored,0,0,0,0,0,0,1,0,0,0,0,1
+Ends in 10:51:33,False Urgency,amazon_in,https://www.amazon.in/s?k=power+bank,end in,1,0,0,0,0,0,0,0,0,0,1,0
+Promoted,Disguised Advertisement,zomato,https://www.zomato.com/bangalore/delivery,promoted,0,0,0,0,0,0,0,0,0,0,0,0
+Download App,Nagging,blinkit,https://blinkit.com/,download app,0,0,0,0,0,0,0,0,0,0,0,0
+Premium Standard ₹139 for 2 months ₹139/month after,SaaS Billing,spotify,https://www.spotify.com/in-en/premium/,premium standard for month month after,0,0,0,0,0,0,0,0,0,0,1,1
+Premium Student ₹69 for 2 months ₹69/month after,SaaS Billing,spotify,https://www.spotify.com/in-en/premium/,premium student for month month after,0,0,0,0,0,0,0,0,0,0,1,1
+Give to Underprivileged Musicians (₹1 per ticket),Basket Sneaking,bookmyshow,https://in.bookmyshow.com/order-summary/ET00491460/CPJI,give to underprivileged musician per ticket,0,0,0,0,0,0,0,0,0,0,1,0
+Convenience fees,Drip Pricing,bookmyshow,https://in.bookmyshow.com/order-summary/ET00491460/CPJI,convenience fee,0,0,0,0,0,1,0,0,0,0,0,0
+This venue does not support booking cancellation.,Subscription Trap,bookmyshow,https://in.bookmyshow.com/order-summary/ET00491460/CPJI,this venue doe not support booking cancellation,0,0,0,0,0,0,0,0,0,0,0,0
+Delivery charge,Drip Pricing,blinkit,https://blinkit.com/cart,delivery charge,0,0,0,0,0,0,0,0,0,0,0,0
+Handling charge,Drip Pricing,blinkit,https://blinkit.com/cart,handling charge,0,0,0,0,0,0,0,0,0,0,0,0
+Login to Proceed,Forced Action,blinkit,https://blinkit.com/cart,login to proceed,0,0,0,0,0,0,0,0,0,0,0,0
+Small cart charge,Drip Pricing,blinkit,https://blinkit.com/cart,small cart charge,0,0,0,0,0,0,0,0,0,0,0,0
+Feeding India donation ₹1,Basket Sneaking,blinkit,https://blinkit.com/cart,feeding india donation,0,0,0,0,0,0,0,0,0,0,1,0
++₹86 Protect Promise Fee,Drip Pricing,flipkart,https://www.flipkart.com/hmd-vibe2-5g-peach-pink-128-gb/p/itm71c3ae6df2a26,protect promise fee,0,0,0,0,0,0,0,0,0,0,1,0
+Coupons Ends in 09h 41m 34s,False Urgency,flipkart,https://www.flipkart.com/hmd-vibe2-5g-peach-pink-128-gb/p/itm71c3ae6df2a26,coupon end in h m s,1,0,0,0,0,0,1,0,0,0,1,0
+Offer Handling Fee ₹99,Drip Pricing,flipkart,https://www.flipkart.com/payments,offer handling fee,0,0,0,0,0,1,1,0,0,0,1,0
+Payment Handling Fee ₹39,Drip Pricing,flipkart,https://www.flipkart.com/payments,payment handling fee,0,0,0,0,0,1,0,0,0,0,1,0
+Pick up charge ₹199,Drip Pricing,reddit_flipkart,https://www.reddit.com/r/FuckFlipkart/comments/1nyvf2p/,pick up charge,0,0,0,0,0,0,0,0,0,0,1,0

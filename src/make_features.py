@@ -2,7 +2,7 @@
 make_features.py — Apply the shared feature extractor to the assembled dataset.
 
 Reads  data/processed/ccpa_dataset.tsv
-Writes data/processed/features.csv  (text + clean_text + 22 numeric features + labels)
+Writes data/processed/features.csv  (text + clean_text + 12 numeric features + labels)
 
 Run:  python -m src.make_features
 """
@@ -22,7 +22,7 @@ def main():
     df = pd.read_csv(IN_PATH, sep="\t", on_bad_lines="skip", engine="python")
     df = df.dropna(subset=["text", "Pattern Category"]).reset_index(drop=True)
 
-    print(f"Extracting features for {len(df)} rows (POS tagging + sentiment)...")
+    print(f"Extracting 12 engineered features for {len(df)} rows...")
     clean, feats = [], []
     for i, txt in enumerate(df["text"].astype(str)):
         clean.append(F.clean_and_lemmatize(txt))

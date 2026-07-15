@@ -2,7 +2,7 @@
 Dark Pattern Detector — DistilBERT showcase (Hugging Face Space, Route 2).
 
 Companion to the classical Streamlit app. That app is the fast, interpretable default
-(TF-IDF + 22 engineered features -> XGBoost, with per-feature "signal" badges). This Space
+(character TF-IDF + 12 engineered features -> calibrated LinearSVC, with signal badges). This Space
 serves the fine-tuned DistilBERT model — higher accuracy, and the only model that holds up
 on real out-of-distribution text, but a black box: it reads whole-phrase meaning instead of
 counting keywords.

@@ -1,15 +1,11 @@
 pandas>=2.0
 numpy>=1.24
-# models in models/*.joblib are pickled with sklearn 1.6.1 (Kaggle).
-# Newer sklearn (>=1.7) removed the internal _RemainderColsList class and
-# fails to unpickle the ColumnTransformer. Keep Kaggle, local, and
-# Streamlit Cloud all on 1.6.1.
-scikit-learn==1.6.1
+# models/*.joblib is exported by src/train.py with this version.
+scikit-learn==1.7.2
 xgboost>=2.0
 imbalanced-learn>=0.11
 optuna>=3.4
 nltk>=3.8
-textblob>=0.17
 matplotlib>=3.7
 seaborn>=0.12
 joblib>=1.3

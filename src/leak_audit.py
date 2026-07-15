@@ -16,10 +16,10 @@ This script:
   2. Quantifies leakage in the naive split NB2 uses
      (train_test_split, test_size=0.2, stratify=y, random_state=42): how many skeleton
      clusters straddle train and test, and how many test rows have a template twin in train.
-  3. Builds a TEMPLATE-AWARE split (StratifiedGroupKFold on skeleton cluster) so no
-     template appears on both sides, and persists those indices for all downstream models.
-  4. Trains the existing classical pipeline (TF-IDF + 22 numeric features -> SMOTE -> SVC/XGB,
-     exactly as in notebook 2) on BOTH splits and reports naive vs leak-free macro-F1.
+  3. Builds a SOURCE-AWARE split. Rows are connected when they share either a template
+     skeleton or page_id, then StratifiedGroupKFold keeps each connected component intact.
+  4. Trains the legacy notebook-2 pipelines on both splits to retain the original leakage
+     comparison. The current character-SVC evaluation lives in src/train.py.
   5. Runs trivial single-signal probes (has-currency-symbol, text-length, keyword-only)
      to check whether a lone confound can predict the class.
 
@@ -33,6 +33,7 @@ straddles the two sides) — so this can gate downstream training.
 Run:  python -m src.leak_audit
 """
 
+import hashlib
 import json
 import os
 import re
@@ -59,19 +60,12 @@ from imblearn.pipeline import Pipeline as ImbPipeline
 from src.collect_data import (
     ADDONS, BRANDS, CATEGORIES, DURATIONS, FEES, FILE_TYPES, PRODUCTS, SOFTWARE,
 )
+from src.features import NUM_COLS
 
 SEED = 42
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEATURES = os.path.join(HERE, "data", "processed", "features.csv")
 REPORTS = os.path.join(HERE, "reports")
-
-NUM_COLS = [
-    "urgency_kw_count", "scarcity_kw_count", "shame_phrase_flag", "cancel_diff_score",
-    "social_proof_flag", "price_drip_flag", "discount_claim_flag", "neg_option_flag",
-    "all_caps_ratio", "exclamation_count", "question_count", "text_length", "word_count",
-    "number_present", "time_reference_flag", "noun_ratio", "verb_ratio", "adj_ratio",
-    "adv_ratio", "sentiment_polarity", "sentiment_subjectivity", "avg_word_len",
-]
 
 # Tuned hyperparameters lifted straight from notebook 2's Optuna study (the params that
 # produced the deployed joblib models), so the inflation figure is for the REAL deployed
@@ -116,6 +110,43 @@ def skeleton(text: str) -> str:
     return s
 
 
+def connected_groups(df: pd.DataFrame) -> np.ndarray:
+    """Group rows transitively by either source page or generated-text skeleton."""
+    parent = list(range(len(df)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(a, b):
+        a, b = find(a), find(b)
+        if a != b:
+            parent[b] = a
+
+    page_ids = df["page_id"] if "page_id" in df else pd.Series(index=df.index, dtype=object)
+    for values in (page_ids, df["text"].fillna("").map(skeleton)):
+        seen = {}
+        for i, value in enumerate(values):
+            if pd.isna(value) or str(value).strip() == "":
+                continue
+            key = str(value)
+            if key in seen:
+                union(i, seen[key])
+            else:
+                seen[key] = i
+
+    return pd.factorize(np.asarray([find(i) for i in range(len(df))]))[0]
+
+
+def dataset_hash(df: pd.DataFrame) -> str:
+    """Hash the row order and fields that define a saved positional split."""
+    cols = ["page_id", "text", "label", "Pattern Category"]
+    payload = df[cols].to_csv(index=False, lineterminator="\n").encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 # --------------------------------------------------------------------------- #
 # 2. Pipelines mirroring notebook 2
 # --------------------------------------------------------------------------- #
@@ -146,7 +177,7 @@ def _xgb_pipe():
     ])
 
 
-_MODELS = {"svc": _svc_pipe, "xgb": _xgb_pipe}
+_MODELS = {"legacy_svc": _svc_pipe, "legacy_xgb": _xgb_pipe}
 
 
 def _macro_f1(pipe_fn, X_tr, y_tr, X_te, y_te):
@@ -224,7 +255,7 @@ def run_probes(df, y, tr, te):
     }
 
     # (b) text-length probe
-    length = df["text_length"].to_numpy().reshape(-1, 1).astype(float)
+    length = df["text"].fillna("").str.len().to_numpy().reshape(-1, 1).astype(float)
     probes["text_length"] = {"macro_f1": _probe_f1(length, y, tr, te)}
 
     # (c) keyword-only probe: TF-IDF on clean_text, no numeric features, no SMOTE
@@ -250,9 +281,10 @@ def main():
     df["clean_text"] = df["clean_text"].fillna("")
     n = len(df)
 
-    # skeleton clustering
+    # skeleton and source-page clustering
     df["skeleton"] = df["text"].map(skeleton)
     skel_codes = df["skeleton"].astype("category").cat.codes.to_numpy()
+    group_codes = connected_groups(df)
     n_clusters = int(df["skeleton"].nunique())
     sib_clusters = int((df["skeleton"].value_counts() > 1).sum())
     largest = df["skeleton"].value_counts().head(5)
@@ -264,13 +296,14 @@ def main():
     # naive split + its leakage
     tr_n, te_n = naive_split(n, y)
     shared_n, leaked_rows_n = cross_split_clusters(skel_codes, tr_n, te_n)
+    shared_source_n, leaked_source_rows_n = cross_split_clusters(group_codes, tr_n, te_n)
 
-    # template-aware split + confirm it is clean
-    tr_g, te_g = template_aware_split(y, skel_codes)
-    shared_g, leaked_rows_g = cross_split_clusters(skel_codes, tr_g, te_g)
+    # source-aware split + confirm neither pages nor templates straddle it
+    tr_g, te_g = template_aware_split(y, group_codes)
+    shared_g, leaked_rows_g = cross_split_clusters(group_codes, tr_g, te_g)
+    shared_skeleton_g, _ = cross_split_clusters(skel_codes, tr_g, te_g)
 
-    # macro-F1 under each split, for BOTH tuned classical models (SVC + XGB).
-    # XGB is the deployed multi-class model, so its inflation is the headline figure.
+    # Historical macro-F1 under each split for the old notebook-2 pipelines.
     per_model = {}
     for key, fn in _MODELS.items():
         f1_naive = _macro_f1(fn, X.iloc[tr_n], y[tr_n], X.iloc[te_n], y[te_n])
@@ -293,29 +326,39 @@ def main():
             "multi_row_clusters": sib_clusters,
             "largest_clusters": {k: int(v) for k, v in largest.items()},
         },
+        "connected_source_groups": int(len(np.unique(group_codes))),
         "naive_split": {
             "test_size": int(len(te_n)),
             "cross_split_clusters": len(shared_n),
             "leaked_test_rows": leaked_rows_n,
             "leaked_test_pct": round(100 * leaked_rows_n / len(te_n), 1),
+            "cross_split_source_groups": len(shared_source_n),
+            "source_leaked_test_rows": leaked_source_rows_n,
         },
         "leak_free_split": {
             "train_size": int(len(tr_g)),
             "test_size": int(len(te_g)),
             "cross_split_clusters": len(shared_g),
             "leaked_test_rows": leaked_rows_g,
+            "cross_split_skeletons": len(shared_skeleton_g),
         },
         "models": per_model,
-        "headline_model": "xgb",
+        "headline_model": "legacy_xgb",
         "trivial_probes": probes,
-        "pipeline": "TF-IDF 1-3gram x300 + 22 num feats -> SMOTE -> {clf}; tuned params from NB2 Optuna",
+        "pipeline": "legacy TF-IDF family + the current 12 numeric features + SMOTE; current model is evaluated by src/train.py",
         "seed": SEED,
     }
 
     with open(os.path.join(REPORTS, "leak_audit.json"), "w") as f:
         json.dump(report, f, indent=2)
     with open(os.path.join(REPORTS, "leak_free_split.json"), "w") as f:
-        json.dump({"train": tr_g.tolist(), "test": te_g.tolist(), "seed": SEED}, f)
+        json.dump({
+            "train": tr_g.tolist(),
+            "test": te_g.tolist(),
+            "seed": SEED,
+            "grouping": "connected_page_or_skeleton_v1",
+            "dataset_sha256": dataset_hash(df),
+        }, f, indent=2)
 
     # console summary
     print("=" * 64)
@@ -331,7 +374,7 @@ def main():
           f"cross-split templates={len(shared_n)}  "
           f"leaked test rows={leaked_rows_n} ({report['naive_split']['leaked_test_pct']}%)")
     print(f"LEAK-FREE split:       test={len(te_g)}  "
-          f"cross-split templates={len(shared_g)}  leaked test rows={leaked_rows_g}")
+          f"cross-split source groups={len(shared_g)}  leaked test rows={leaked_rows_g}")
     print("-" * 64)
     print(f"{'model':6s} {'naive':>8s} {'leak-free':>10s} {'drop':>8s} {'rel%':>7s}")
     for key, m in per_model.items():
@@ -346,11 +389,12 @@ def main():
     print(f"wrote {os.path.join('reports', 'leak_free_split.json')}")
 
     # gate: the leak-free split MUST be clean
-    if len(shared_g) > 0:
-        print(f"\nFAIL: leak-free split still has {len(shared_g)} straddling templates",
+    if shared_g or shared_skeleton_g:
+        print(f"\nFAIL: leak-free split still has {len(shared_g)} source groups and "
+              f"{len(shared_skeleton_g)} skeletons crossing the split",
               file=sys.stderr)
         return 1
-    print("\nOK: leak-free split is template-clean.")
+    print("\nOK: leak-free split is page- and template-clean.")
     return 0
 
 

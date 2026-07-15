@@ -9,14 +9,8 @@ Run:  /opt/anaconda3/bin/python -m src.error_analysis
 """
 import json
 import os
-import re
 import numpy as np
 import pandas as pd
-
-import nltk
-from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
-from textblob import TextBlob
 
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -30,61 +24,17 @@ from imblearn.pipeline import Pipeline as ImbPipeline
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from src import features as F
 
 SEED = 42
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NUM_COLS = [
-    "urgency_kw_count", "scarcity_kw_count", "shame_phrase_flag", "cancel_diff_score",
-    "social_proof_flag", "price_drip_flag", "discount_claim_flag", "neg_option_flag",
-    "all_caps_ratio", "exclamation_count", "question_count", "text_length", "word_count",
-    "number_present", "time_reference_flag", "noun_ratio", "verb_ratio", "adj_ratio",
-    "adv_ratio", "sentiment_polarity", "sentiment_subjectivity", "avg_word_len",
-]
+NUM_COLS = F.NUM_COLS
 
-# ---- NB1 feature code (verbatim) so classical sees identical OOD inputs ----
-URGENCY_KW = [r"hurry", r"limited time", r"ends in", r"only.*hours", r"today only", r"flash sale",
-              r"act now", r"last chance", r"don't miss", r"expires", r"sale ends", r"ending soon"]
-SCARCITY_KW = [r"only \d+ left", r"low stock", r"selling fast", r"almost gone", r"high demand",
-               r"\d+ remaining", r"few left", r"running out", r"limited stock"]
-SHAME_PHRASES = [r"no thanks", r"i don't need", r"prefer to pay", r"i hate", r"hate saving", r"i prefer"]
-CANCEL_DIFF = [r"to cancel.*call", r"registered mail", r"hotline", r"cancellation fee",
-               r"live agent", r"business hours", r"retention team", r"call.*to cancel"]
-SOCIAL_PROOF = [r"people.*viewing", r"people.*bought", r"watching this", r"\d+ people", r"booked in the last"]
-PRICE_DRIP = [r"processing fee", r"service charge", r"convenience fee", r"booking fee", r"resort fee",
-              r"handling fee", r"surcharge", r"added at checkout", r"not included in"]
-DISCOUNT = [r"\d+% off", r"save \$", r"you save", r"coupon", r"discount", r"deal", r"offer"]
-NEG_OPT = [r"pre-ticked", r"auto-renew", r"pre-selected", r"checked by default", r"uncheck", r"automatically renew"]
-
-_lemm = WordNetLemmatizer()
 def clean_and_lemmatize(text):
-    text = re.sub(r'[^a-zA-Z\s!?]', '', str(text).lower())
-    return ' '.join(_lemm.lemmatize(t) for t in word_tokenize(text))
+    return F.clean_and_lemmatize(text)
 
 def extract_features(text):
-    text = str(text); low = text.lower(); blob = TextBlob(text)
-    tokens = word_tokenize(low); pos = nltk.pos_tag(tokens) if tokens else []
-    total = len(pos) if pos else 1
-    nouns = sum(1 for _, t in pos if t.startswith('NN')); verbs = sum(1 for _, t in pos if t.startswith('VB'))
-    adjs = sum(1 for _, t in pos if t.startswith('JJ')); advs = sum(1 for _, t in pos if t.startswith('RB'))
-    words = text.split()
-    return {
-        "urgency_kw_count": sum(bool(re.search(p, low)) for p in URGENCY_KW),
-        "scarcity_kw_count": sum(bool(re.search(p, low)) for p in SCARCITY_KW),
-        "shame_phrase_flag": int(any(re.search(p, low) for p in SHAME_PHRASES)),
-        "cancel_diff_score": sum(bool(re.search(p, low)) for p in CANCEL_DIFF),
-        "social_proof_flag": int(any(re.search(p, low) for p in SOCIAL_PROOF)),
-        "price_drip_flag": int(any(re.search(p, low) for p in PRICE_DRIP)),
-        "discount_claim_flag": int(any(re.search(p, low) for p in DISCOUNT)),
-        "neg_option_flag": int(any(re.search(p, low) for p in NEG_OPT)),
-        "all_caps_ratio": sum(1 for c in text if c.isupper()) / max(len(text), 1),
-        "exclamation_count": text.count("!"), "question_count": text.count("?"),
-        "text_length": len(text), "word_count": len(words),
-        "number_present": int(bool(re.search(r"\d+", text))),
-        "time_reference_flag": int(bool(re.search(r"hour|minute|day|today|soon|week|month|year", low))),
-        "noun_ratio": nouns/total, "verb_ratio": verbs/total, "adj_ratio": adjs/total, "adv_ratio": advs/total,
-        "sentiment_polarity": blob.sentiment.polarity, "sentiment_subjectivity": blob.sentiment.subjectivity,
-        "avg_word_len": sum(len(w) for w in words)/len(words) if words else 0,
-    }
+    return F.extract_features(text)
 
 
 def classical_pipe(kind):

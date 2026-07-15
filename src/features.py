@@ -8,8 +8,8 @@ into three different files, which is a classic source of train/serve skew.
 
 Route 1 philosophy (classical NLP + core ML):
     Short UI strings (5-15 words) do not benefit much from transformer attention.
-    What matters is whether words like "hurry" appear, the punctuation, the sentiment,
-    and the part-of-speech mix. We turn raw text into a fixed tabular feature vector
+    What matters is whether words like "hurry" appear and a few punctuation/number
+    signals. We turn raw text into a fixed tabular feature vector
     that classical scikit-learn models can consume and that humans can interpret.
 """
 
@@ -17,15 +17,11 @@ import re
 import nltk
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-from textblob import TextBlob
 
 # --------------------------------------------------------------------------- #
 # NLTK bootstrap
 # --------------------------------------------------------------------------- #
-_NLTK_PACKAGES = [
-    "punkt", "punkt_tab", "wordnet", "omw-1.4",
-    "averaged_perceptron_tagger", "averaged_perceptron_tagger_eng",
-]
+_NLTK_PACKAGES = ["punkt", "punkt_tab", "wordnet", "omw-1.4"]
 
 
 def ensure_nltk(quiet=True):
@@ -88,14 +84,12 @@ NEG_OPT = [
     r"auto-debit", r"uncheck", r"leave.*box.*unchecked",
 ]
 
-# The exact, ordered list of numeric feature columns the model consumes.
+# The exact, ordered list of engineered columns the model consumes.
 # Keep this list and extract_features() in lock-step.
 NUM_COLS = [
     "urgency_kw_count", "scarcity_kw_count", "shame_phrase_flag", "cancel_diff_score",
     "social_proof_flag", "price_drip_flag", "discount_claim_flag", "neg_option_flag",
-    "all_caps_ratio", "exclamation_count", "question_count", "text_length", "word_count",
-    "number_present", "time_reference_flag", "noun_ratio", "verb_ratio", "adj_ratio",
-    "adv_ratio", "sentiment_polarity", "sentiment_subjectivity", "avg_word_len",
+    "exclamation_count", "question_count", "number_present", "time_reference_flag",
 ]
 
 
@@ -113,28 +107,13 @@ def clean_and_lemmatize(text):
 
 
 def extract_features(text):
-    """Turn a raw UI string into the 22-dimensional interpretable feature dict.
+    """Turn a raw UI string into the 12-dimensional interpretable feature dict.
 
     Returns a plain dict keyed exactly by NUM_COLS so callers can build a
     one-row DataFrame for prediction or stack many rows for training.
     """
     text = str(text)
     text_lower = text.lower()
-
-    blob = TextBlob(text)
-    sentiment_polarity = blob.sentiment.polarity
-    sentiment_subj = blob.sentiment.subjectivity
-
-    tokens = word_tokenize(text_lower)
-    pos_tags = nltk.pos_tag(tokens) if tokens else []
-    noun_count = sum(1 for _, tag in pos_tags if tag.startswith("NN"))
-    verb_count = sum(1 for _, tag in pos_tags if tag.startswith("VB"))
-    adj_count = sum(1 for _, tag in pos_tags if tag.startswith("JJ"))
-    adv_count = sum(1 for _, tag in pos_tags if tag.startswith("RB"))
-    total_tags = len(pos_tags) if pos_tags else 1
-
-    words = text.split()
-    avg_word_len = sum(len(w) for w in words) / len(words) if words else 0.0
 
     return {
         # --- keyword / lexical signals --------------------------------------
@@ -147,22 +126,10 @@ def extract_features(text):
         "discount_claim_flag": int(any(re.search(p, text_lower) for p in DISCOUNT)),
         "neg_option_flag":     int(any(re.search(p, text_lower) for p in NEG_OPT)),
         # --- structural signals --------------------------------------------
-        "all_caps_ratio":      sum(1 for c in text if c.isupper()) / max(len(text), 1),
         "exclamation_count":   text.count("!"),
         "question_count":      text.count("?"),
-        "text_length":         len(text),
-        "word_count":          len(words),
         "number_present":      int(bool(re.search(r"\d+", text))),
         "time_reference_flag": int(bool(re.search(r"hour|minute|day|tonight|today|soon|week|month|year", text_lower))),
-        # --- part-of-speech ratios -----------------------------------------
-        "noun_ratio":          noun_count / total_tags,
-        "verb_ratio":          verb_count / total_tags,
-        "adj_ratio":           adj_count / total_tags,
-        "adv_ratio":           adv_count / total_tags,
-        # --- sentiment / readability ---------------------------------------
-        "sentiment_polarity":  sentiment_polarity,
-        "sentiment_subjectivity": sentiment_subj,
-        "avg_word_len":        avg_word_len,
     }
 
 
