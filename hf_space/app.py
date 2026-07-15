@@ -3,13 +3,12 @@ Dark Pattern Detector — DistilBERT showcase (Hugging Face Space, Route 2).
 
 Companion to the classical Streamlit app. That app is the fast, interpretable default
 (character TF-IDF + 12 engineered features -> calibrated LinearSVC, with signal badges). This Space
-serves the fine-tuned DistilBERT model — higher accuracy, and the only model that holds up
-on real out-of-distribution text, but a black box: it reads whole-phrase meaning instead of
-counting keywords.
+serves the fine-tuned DistilBERT model, a black box that reads whole-phrase meaning instead
+of counting keywords.
 
 So the interpretability surface here is different *on purpose*. Instead of faking keyword
 badges the transformer doesn't use, we show its full softmax distribution across all 14
-classes — what it considered, and how sure it was. That is the honest "why" for a transformer.
+classes. These softmax scores show what it considered, but are not calibrated confidence.
 
 Weights load from a separate HF Model repo (set MODEL_ID), so this Space stays light.
 """
@@ -20,6 +19,11 @@ import json
 import gradio as gr
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+try:
+    from .presentation import ABSTAIN_THRESHOLD, BENIGN, result_status
+except ImportError:  # HF Spaces uploads this directory as the repository root.
+    from presentation import ABSTAIN_THRESHOLD, BENIGN, result_status
 
 # Model repo holding the fine-tuned weights. Override via the MODEL_ID Space secret/variable
 # if your HF username/repo differs. A local directory also works (handy for local testing).
@@ -34,30 +38,26 @@ CLASSES = [
     "Nagging", "Not a Dark Pattern", "Rogue Malware", "SaaS Billing",
     "Subscription Trap", "Trick Question",
 ]
-BENIGN = "Not a Dark Pattern"
 MAX_LEN = 64
 
-# Precision lever (mirrors the classical app's behaviour): if the top prediction is a
-# dark pattern but the model isn't confident enough, fall back to "benign" rather than
-# cry wolf. Tune freely — the full distribution is always shown regardless.
-CONF_THRESHOLD = 0.50
-
-CCPA_CLAUSES = {
-    "False Urgency": "Clause 1 — Falsely implying scarcity/urgency/popular demand to rush a purchase.",
-    "Basket Sneaking": "Clause 2 — Adding items or charges to the cart without explicit consent.",
-    "Confirm Shaming": "Clause 3 — Using guilt or shame to steer the user's choice.",
-    "Forced Action": "Clause 4 — Forcing actions unrelated to the user's goal to proceed.",
-    "Subscription Trap": "Clause 5 — Blocking easy cancellation or creating auto-debit loops.",
-    "Interface Interference": "Clause 6 — Visual tricks that hide or de-emphasise key options.",
-    "Bait and Switch": "Clause 7 — Advertising one thing but delivering another.",
-    "Drip Pricing": "Clause 8 — Revealing mandatory fees only at the final checkout step.",
-    "Disguised Advertisement": "Clause 9 — Masking ads as organic reviews or content.",
-    "Nagging": "Clause 10 — Repeatedly interrupting the user with prompts.",
-    "Trick Question": "Clause 11 — Confusing double-negatives or checkboxes to extract consent.",
-    "SaaS Billing": "Clause 12 — Silent trial-to-paid billing conversions.",
-    "Rogue Malware": "Clause 13 — Fake security/virus alerts to force downloads.",
-    "Not a Dark Pattern": "Safe under CCPA Guidelines 2023 — benign UI text.",
+# Provisional UI band only; it has not been selected as a legal or operational threshold.
+PATTERN_GUIDANCE = {
+    "False Urgency": ("Language resembling urgency or scarcity.", "Verify the timer, inventory, demand, and offer expiry."),
+    "Basket Sneaking": ("Language resembling an added item or charge.", "Compare the cart before and after the user's explicit choices."),
+    "Confirm Shaming": ("Language that may shame or guilt a user.", "Review the surrounding choices and whether refusal is neutral."),
+    "Forced Action": ("Language suggesting an extra action may be required.", "Check whether the user's task is blocked by an unrelated action."),
+    "Subscription Trap": ("Language resembling enrollment or cancellation friction.", "Review the complete signup, renewal, and cancellation flow."),
+    "Interface Interference": ("Language associated with possible interface interference.", "Inspect layout, defaults, contrast, prominence, and nearby controls."),
+    "Bait and Switch": ("Language resembling a changed offer or outcome.", "Compare the original offer, selected action, and actual result."),
+    "Drip Pricing": ("Language resembling late price disclosure.", "Compare every price shown from listing through final payment."),
+    "Disguised Advertisement": ("Language resembling promotional content.", "Check sponsorship, placement, and disclosure context."),
+    "Nagging": ("Language associated with repeated prompting.", "Observe how often and when the prompt reappears."),
+    "Trick Question": ("Language resembling confusing consent wording.", "Review checkbox defaults, nearby wording, and the effect of each choice."),
+    "SaaS Billing": ("Language associated with trial or recurring billing.", "Verify renewal terms, consent, reminders, and cancellation steps."),
+    "Rogue Malware": ("Language resembling an alarming security prompt.", "Verify the source, device state, requested action, and download target."),
+    BENIGN: ("The model found no category-level textual signal in this snippet.", "Review the surrounding interface and full user flow before drawing a conclusion."),
 }
+DISPLAY_LABELS = {"Trick Question": "Trick Wording (model label: Trick Question)"}
 
 # A few representative examples per category for one-click testing (gr.Examples).
 EXAMPLES = [
@@ -115,27 +115,36 @@ def analyze(text):
         logits = MODEL(input_ids=enc["input_ids"],
                        attention_mask=enc["attention_mask"]).logits[0]
     probs = torch.softmax(logits, dim=-1).tolist()
-    dist = {LABELS[i]: float(probs[i]) for i in range(len(LABELS))}
+    dist = {DISPLAY_LABELS.get(LABELS[i], LABELS[i]): float(probs[i]) for i in range(len(LABELS))}
 
     top = max(range(len(probs)), key=lambda i: probs[i])
     label, conf = LABELS[top], probs[top]
 
-    # weak dark-pattern call -> treat as benign (precision over recall)
-    if label != BENIGN and conf < CONF_THRESHOLD:
-        label = BENIGN
+    status = result_status(label, conf)
+    description, context = PATTERN_GUIDANCE[label]
+    display_label = DISPLAY_LABELS.get(label, label)
 
-    if label == BENIGN:
+    if status == "inconclusive":
         verdict = (
-            "### ✅ CCPA Safe / Benign\n"
-            f"**{conf:.0%}** confidence on the top class.\n\n"
-            f"{CCPA_CLAUSES[BENIGN]}"
+            "### ⚪ Inconclusive from text alone\n"
+            f"Leading model category: **{display_label}** ({conf:.0%} softmax score).\n\n"
+            f"This is below the provisional {ABSTAIN_THRESHOLD:.0%} display threshold; "
+            "it is not relabeled as benign.\n\n"
+            f"**Context needed:** {context}"
+        )
+    elif status == "no_signal":
+        verdict = (
+            "### ✅ No textual signal found\n"
+            f"**{conf:.0%}** softmax score for the top class.\n\n"
+            f"{description}\n\n**Context needed:** {context}"
         )
     else:
         verdict = (
-            "### 🔴 CCPA Violation Detected\n"
-            f"**{label}** — {conf:.0%} confidence\n\n"
-            f"{CCPA_CLAUSES.get(label, '')}"
+            "### 🔴 Potential textual signal\n"
+            f"**{display_label}** — {conf:.0%} softmax score\n\n"
+            f"{description}\n\n**Context needed:** {context}"
         )
+    verdict += "\n\n*Screening result only; human review is required for any compliance conclusion.*"
     return dist, verdict
 
 
@@ -148,8 +157,8 @@ with gr.Blocks(title="Dark Pattern Detector — DistilBERT", theme=gr.themes.Sof
                css=CUSTOM_CSS) as demo:
     gr.Markdown(
         "# 🔍 Dark Pattern Detector — DistilBERT\n"
-        "Fine-tuned transformer that flags deceptive UI copy under **India's CCPA "
-        "Dark Pattern Guidelines, 2023** (13 illegal classes + benign). This is the "
+        "Research risk screener trained against the 13 categories named in **India's CCPA "
+        "Dark Pattern Guidelines, 2023**, plus a no-dark-pattern class. This is the "
         "higher-accuracy companion to the classical Streamlit app — it reads whole-phrase "
         "meaning rather than counting keywords."
     )
@@ -165,22 +174,23 @@ with gr.Blocks(title="Dark Pattern Detector — DistilBERT", theme=gr.themes.Sof
             gr.Examples(EXAMPLES, inputs=inp, label="Or try a sample")
         with gr.Column(scale=1):
             verdict = gr.Markdown(elem_id="verdict")
-            # gr.Label IS the transformer's interpretability surface: the full confidence
+            # gr.Label is the transformer's interpretability surface: the full softmax
             # spread across all 14 classes, not a fabricated keyword breakdown.
-            dist = gr.Label(num_top_classes=5, label="Confidence across classes")
+            dist = gr.Label(num_top_classes=5, label="Model scores across classes")
 
     btn.click(analyze, inputs=inp, outputs=[dist, verdict])
     inp.submit(analyze, inputs=inp, outputs=[dist, verdict])
 
     with gr.Accordion("Why no keyword badges here? (interpretability note)", open=False):
         gr.Markdown(
-            "The **classical** model scores 22 hand-built signals (urgency words, hidden-fee "
+            "The **classical** model scores 12 hand-built signals (urgency words, hidden-fee "
             "phrasing, cancellation friction…), so its app can show *which* features fired. "
             "DistilBERT has no such features — it learns phrasing directly. Its honest "
-            "interpretability surface is the **probability distribution** above: what it "
-            "weighed and how confident it was. When the top dark-pattern class is below "
-            f"{int(CONF_THRESHOLD*100)}% it defaults to *benign* to avoid false alarms.\n\n"
-            "*Research/educational demo — not legal advice. "
+            "interpretability surface is the **softmax score distribution** above: what it "
+            "weighed, not calibrated confidence. Any top score below the provisional "
+            f"{int(ABSTAIN_THRESHOLD*100)}% display threshold is shown as *inconclusive*, "
+            "never converted to benign.\n\n"
+            "*Research/educational risk screener — not a compliance verdict or legal advice. "
             "Made by [Abhishek Goyal](https://github.com/goyashek).*"
         )
 

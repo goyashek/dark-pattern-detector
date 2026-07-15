@@ -6,6 +6,42 @@
 modeling, inference, applications, dependencies, reproducibility, testing, deployment,
 security, accessibility, documentation, and repository hygiene.
 
+## Session 6 Continuation Update — 2026-07-15
+
+This is the current handoff point and supersedes the previous "Start here next session" list.
+
+### Completed in this continuation
+
+- Completed **A01** across the Streamlit app, HF Space, and both READMEs. Results now say
+  "potential textual signal," "no textual signal found," or "inconclusive" rather than
+  declaring a CCPA violation or safe/compliant result.
+- Replaced the invented numbered "clauses" with category descriptions and category-specific
+  context needed for human review. The official display name "Trick Wording" is shown while
+  retaining "Trick Question" as the unchanged trained-model label.
+- Completed the immediate **A02** containment work. The HF Space no longer converts a weak dark
+  prediction to benign. Any top-class softmax score below the provisional 50% display threshold
+  abstains symmetrically, including when the leading class is benign. The full distribution is
+  labeled as model scores rather than calibrated confidence.
+- Added a dependency-free regression test covering dark and benign abstention plus the exact 50%
+  boundary. All three unit tests, Python compilation, and Git whitespace checks pass. The
+  Streamlit server and health endpoint start successfully.
+
+### Remaining limitation
+
+- The 50% HF abstention boundary is a clearly labeled provisional display rule, not a calibrated
+  operating threshold. Full calibration and cost-based threshold selection remain **A15**.
+- A local end-to-end HF UI smoke test was not run because this environment does not install
+  Gradio; the Space SDK supplies its pinned Gradio runtime. The pure presentation logic and app
+  syntax were checked locally.
+
+### Start here next
+
+1. Complete **A03/A05**: add an artifact manifest and exact tested environment/revision metadata,
+   including the newly rerun DistilBERT artifact.
+2. Address **A10-A12**: validate taxonomy mapping and provenance, then plan a real adjudicated
+   benchmark that excludes generated rows from validation/test.
+3. Expand **A09**: add CI, artifact-load/golden-prediction checks, and app smoke tests.
+
 ## Session 5 Completion Update — 2026-07-15
 
 This section is the handoff point for the next session. It supersedes older current-state

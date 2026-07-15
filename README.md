@@ -1,4 +1,4 @@
-# CCPA 2023 Compliance Classifier: Dark Pattern Detector
+# Dark Pattern Text Risk Screener
 
 <p align="left">
   <a href="https://dark-patterns.streamlit.app/" target="_blank">
@@ -12,17 +12,17 @@
   </a>
 </p>
 
-A compliance auditing tool that reads website/application UI text copy (e.g., urgency flags, pre-checked opt-ins, confirm-shaming prompts) and classifies it into one of **14 categories**—India's **13 illegal dark-pattern classes** established by the **Central Consumer Protection Authority (CCPA) in November 2023** plus a *Not a Dark Pattern* (safe/benign) class.
+A research prototype that reads website/application UI text and maps it onto **14 model classes**: the **13 dark-pattern categories** named by India's Central Consumer Protection Authority (CCPA) in 2023 plus *Not a Dark Pattern*. It screens for possible textual signals; it cannot determine compliance from a single snippet.
 
 > [!NOTE]
-> **Two live demos**: the compact **classical** model on [dark-patterns.streamlit.app](https://dark-patterns.streamlit.app/), and the **fine-tuned DistilBERT** on [its Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern).
+> **Two live research demos**: the compact **classical** model on [dark-patterns.streamlit.app](https://dark-patterns.streamlit.app/), and the **fine-tuned DistilBERT** on [its Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern). The HF demo reports top scores below 50% as inconclusive instead of relabeling them benign.
 
 ---
 
 ## 🇮🇳 Regulatory Context & Motivation
 
-> On **30 November 2023**, India's CCPA declared **13 categories of dark patterns** illegal under the Consumer Protection Act, 2019. 
-> This tool automates the compliance review of UI text strings against these enforceable legal clauses.
+> India's 2023 CCPA guidelines name 13 dark-pattern categories. Many depend on visual hierarchy, defaults, repetition, pricing stages, or a complete signup/cancellation flow.
+> This project supports research and human review; its text classifications are not legal findings.
 
 ---
 
@@ -34,11 +34,11 @@ This project maps the academic baseline corpus (**Yada et al. 2022**) onto CCPA 
 
 | Feature / Metric | Yada et al. 2022 (Baseline) | This Project |
 | :--- | :--- | :--- |
-| **Label Space** | Binary + 7 Academic Taxonomy Classes | **14 Classes** (13 CCPA Legal Classes + Benign) |
-| **Practical Context** | Academic Research | **Regulatory Compliance & Auditing** |
+| **Label Space** | Binary + 7 Academic Taxonomy Classes | **14 Classes** (13 named categories + no-dark-pattern) |
+| **Practical Context** | Academic Research | **Research risk screening** |
 | **Class Coverage** | Missing legal categories, high class skew | **All 13 CCPA classes represented** |
 | **Explainability** | Black-box Transformer predictions | **Both offered**: separate lexical signal badges with the classical model and a fine-tuned DistilBERT |
-| **Inference Layer** | Raw uncalibrated model outputs | **Grouped sigmoid calibration** |
+| **Inference Layer** | Raw uncalibrated model outputs | **Grouped sigmoid calibration (classical); provisional abstention (HF)** |
 
 ---
 
@@ -213,4 +213,4 @@ The notebook, saved feature table, training pipeline, and Streamlit app now shar
 
 ## ⚠️ Disclaimer
 > [!WARNING]
-> This is a **test demonstration project** and does not constitute formal legal advice. Always consult a legal professional for compliance validation.
+> This text-only research screener does not establish compliance or a legal violation. Review the complete interface and user flow with qualified domain and legal experts.

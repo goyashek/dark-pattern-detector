@@ -9,13 +9,13 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 license: mit
-short_description: Fine-tuned DistilBERT flagging deceptive UI copy (CCPA 2023)
+short_description: DistilBERT risk screening for potential dark-pattern text
 ---
 
 # Dark Pattern Detector — DistilBERT
 
-Fine-tuned DistilBERT that classifies UI copy into **India's CCPA Dark Pattern
-Guidelines, 2023** taxonomy — 13 illegal dark-pattern classes plus a benign class.
+Fine-tuned DistilBERT research screener that maps UI copy onto the 13 categories named in
+**India's CCPA Dark Pattern Guidelines, 2023**, plus a no-dark-pattern class.
 
 This Space is the higher-accuracy companion to a classical TF-IDF + engineered-feature
 model (served separately as a Streamlit app). The classical model is the fast, fully
@@ -26,9 +26,10 @@ real-world text, at the cost of size and explainability.
 
 The classical app highlights *which* hand-built signals fired (urgency words, hidden-fee
 phrasing, cancellation friction). DistilBERT has no such features — so its honest
-interpretability surface is the **full confidence distribution across all 14 classes**,
-shown alongside each prediction. When the top dark-pattern class is below the confidence
-threshold, it defaults to *benign* to favour precision over false alarms.
+interpretability surface is the **full softmax score distribution across all 14 classes**,
+shown alongside each prediction. These scores are not calibrated confidence. Any top score
+below the provisional 50% display threshold is reported as *inconclusive* rather than being
+converted to benign.
 
 ## Configuration
 
@@ -39,5 +40,6 @@ threshold, it defaults to *benign* to favour precision over false alarms.
 
 ## Disclaimer
 
-Research / educational demo — not legal advice. Made by
+Text-only research screener — not a compliance verdict or legal advice. Review the full
+interface and user flow before drawing a conclusion. Made by
 [Abhishek Goyal](https://github.com/goyashek).

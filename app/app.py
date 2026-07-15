@@ -27,22 +27,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-CCPA_CLAUSES = {
-    "False Urgency": "Clause 1 — Falsely implying scarcity/urgency/popular demand to rush a purchase.",
-    "Basket Sneaking": "Clause 2 — Adding items or charges to the cart without explicit consent.",
-    "Confirm Shaming": "Clause 3 — Using guilt or shame to steer the user's choice.",
-    "Forced Action": "Clause 4 — Forcing actions unrelated to the user's goal to proceed.",
-    "Subscription Trap": "Clause 5 — Blocking easy cancellation or creating auto-debit loops.",
-    "Interface Interference": "Clause 6 — Visual tricks that hide or de-emphasise key options.",
-    "Bait and Switch": "Clause 7 — Advertising one thing but delivering another.",
-    "Drip Pricing": "Clause 8 — Revealing mandatory fees only at the final checkout step.",
-    "Disguised Advertisement": "Clause 9 — Masking ads as organic reviews or content.",
-    "Nagging": "Clause 10 — Repeatedly interrupting the user with prompts.",
-    "Trick Question": "Clause 11 — Confusing double-negatives or checkboxes to extract consent.",
-    "SaaS Billing": "Clause 12 — Silent trial-to-paid billing conversions.",
-    "Rogue Malware": "Clause 13 — Fake security/virus alerts to force downloads.",
-    "Not a Dark Pattern": "Safe under CCPA Guidelines 2023 — benign UI text.",
+PATTERN_GUIDANCE = {
+    "False Urgency": ("Language resembling urgency or scarcity.", "Verify the timer, inventory, demand, and offer expiry."),
+    "Basket Sneaking": ("Language resembling an added item or charge.", "Compare the cart before and after the user's explicit choices."),
+    "Confirm Shaming": ("Language that may shame or guilt a user.", "Review the surrounding choices and whether refusal is neutral."),
+    "Forced Action": ("Language suggesting an extra action may be required.", "Check whether the user's task is blocked by an unrelated action."),
+    "Subscription Trap": ("Language resembling enrollment or cancellation friction.", "Review the complete signup, renewal, and cancellation flow."),
+    "Interface Interference": ("Language associated with possible interface interference.", "Inspect layout, defaults, contrast, prominence, and nearby controls."),
+    "Bait and Switch": ("Language resembling a changed offer or outcome.", "Compare the original offer, selected action, and actual result."),
+    "Drip Pricing": ("Language resembling late price disclosure.", "Compare every price shown from listing through final payment."),
+    "Disguised Advertisement": ("Language resembling promotional content.", "Check sponsorship, placement, and disclosure context."),
+    "Nagging": ("Language associated with repeated prompting.", "Observe how often and when the prompt reappears."),
+    "Trick Question": ("Language resembling confusing consent wording.", "Review checkbox defaults, nearby wording, and the effect of each choice."),
+    "SaaS Billing": ("Language associated with trial or recurring billing.", "Verify renewal terms, consent, reminders, and cancellation steps."),
+    "Rogue Malware": ("Language resembling an alarming security prompt.", "Verify the source, device state, requested action, and download target."),
+    "Not a Dark Pattern": ("The model found no category-level textual signal in this snippet.", "Review the surrounding interface and full user flow before drawing a conclusion."),
 }
+DISPLAY_LABELS = {"Trick Question": "Trick Wording (model label: Trick Question)"}
 
 
 @st.cache_resource
@@ -57,7 +58,7 @@ def boot():
 @st.cache_data
 def get_samples_by_category():
     path = os.path.join(ROOT, "data", "processed", "ccpa_dataset.tsv")
-    samples = {cat: [] for cat in CCPA_CLAUSES.keys()}
+    samples = {cat: [] for cat in PATTERN_GUIDANCE}
     
     # High quality representative samples for fallback & verification
     fallback = {
@@ -176,7 +177,7 @@ def main():
     }
     
     /* Result Cards */
-    .violation-card {
+    .signal-card {
         background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.03) 100%);
         border: 1px solid rgba(239, 68, 68, 0.25);
         border-radius: 16px;
@@ -185,7 +186,7 @@ def main():
         transition: all 0.3s ease;
         margin-bottom: 20px;
     }
-    .violation-card:hover {
+    .signal-card:hover {
         border-color: rgba(239, 68, 68, 0.4);
         box-shadow: 0 12px 40px 0 rgba(239, 68, 68, 0.1);
     }
@@ -273,7 +274,7 @@ def main():
     <div style="text-align: center; padding: 10px 0 0px 0;">
         <h1 class="hero-title" style="font-size: 2.8rem;">🔍 Dark Pattern Detector</h1>
         <p style="font-size: 1.0rem; color: #94a3b8; max-width: 800px; margin: 0 auto; padding-bottom: 20px;">
-            Auditing website copy for deceptive design patterns under CCPA 2023 Guidelines.
+            Screening website copy for potential dark-pattern language under the CCPA 2023 Guidelines.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -292,7 +293,7 @@ def main():
     <div style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <h3 style="margin-top: 0; color: #f1f5f9; font-size: 1.1rem; font-family: 'Outfit', sans-serif;">⚙️ Classifier Info</h3>
         <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.4; margin-bottom: 0;">
-            14-class detector mapping UI copy onto India's 13 CCPA dark-pattern types plus a benign class. 
+            Research classifier mapping UI text onto India's 13 named dark-pattern categories plus a no-dark-pattern class.
             Model: character TF-IDF + 12 engineered features + SMOTE + calibrated LinearSVC.
         </p>
     </div>
@@ -302,7 +303,7 @@ def main():
     <div style="background-color: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <h3 style="margin-top: 0; color: #fca5a5; font-size: 1.0rem; font-family: 'Outfit', sans-serif;">⚠️ Legal Disclaimer</h3>
         <p style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.4; margin-bottom: 0;">
-            This is a <strong>test demonstration project</strong> and does not constitute formal legal advice. Always consult a legal professional for compliance validation.
+            This text-only risk screener cannot establish compliance or a legal violation. Review the full interface and user flow with a qualified professional.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -323,7 +324,13 @@ def main():
         with st.expander("💡 Click here to test using a pre-loaded Demo Sample instead", expanded=False):
             col_sample_sel, col_sample_btn = st.columns([3.2, 0.8], gap="medium")
             with col_sample_sel:
-                selected_cat = st.selectbox("Select CCPA Category to Sample:", list(CCPA_CLAUSES.keys()), key="sample_sel", label_visibility="collapsed")
+                selected_cat = st.selectbox(
+                    "Select Category to Sample:",
+                    list(PATTERN_GUIDANCE),
+                    format_func=lambda label: DISPLAY_LABELS.get(label, label),
+                    key="sample_sel",
+                    label_visibility="collapsed",
+                )
             with col_sample_btn:
                 if st.button("🎲 Load Sample Text", use_container_width=True):
                     cat_samples = samples.get(selected_cat, [])
@@ -362,22 +369,24 @@ def main():
             # Only predict if the user has clicked "Analyze Copy"
             if st.session_state.get("analyzed", False) and text:
                 label, conf, feats = predict(text, multi, le)
+                description, context = PATTERN_GUIDANCE[label]
+                display_label = DISPLAY_LABELS.get(label, label)
                 
                 # Display result card
                 if label != "Not a Dark Pattern":
                     st.markdown(f"""
-                    <div class="violation-card">
+                    <div class="signal-card">
                         <div style="font-size: 0.8rem; font-weight: 700; color: #f87171; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px;">
-                            🔴 CCPA VIOLATION DETECTED
+                            🔴 POTENTIAL TEXTUAL SIGNAL
                         </div>
                         <div style="font-size: 1.6rem; font-weight: 700; color: #fef2f2; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">
-                            {label}
+                            {display_label}
                         </div>
                         <div style="font-size: 0.95rem; color: #fca5a5; margin-bottom: 16px; line-height: 1.4;">
-                            {CCPA_CLAUSES.get(label, "")}
+                            {description}
                         </div>
                         <div style="display: inline-block; background-color: rgba(239, 68, 68, 0.15); color: #fca5a5; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: 1px solid rgba(239, 68, 68, 0.25);">
-                            Confidence: {conf:.1%}
+                            Top-class probability: {conf:.1%}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -385,22 +394,24 @@ def main():
                     st.markdown(f"""
                     <div class="safe-card">
                         <div style="font-size: 0.8rem; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px;">
-                            ✅ CCPA SAFE / BENIGN
+                            ✅ NO TEXTUAL SIGNAL FOUND
                         </div>
                         <div style="font-size: 1.6rem; font-weight: 700; color: #ecfdf5; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">
-                            Safe / Benign
+                            No textual signal
                         </div>
                         <div style="font-size: 0.95rem; color: #a7f3d0; margin-bottom: 16px; line-height: 1.4;">
-                            Safe under CCPA Guidelines 2023 — benign UI text.
+                            {description}
                         </div>
                         <div style="display: inline-block; background-color: rgba(16, 185, 129, 0.15); color: #a7f3d0; padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: 1px solid rgba(16, 185, 129, 0.25);">
-                            Confidence: {conf:.1%}
+                            Top-class probability: {conf:.1%}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+
+                st.info(f"Context needed: {context} This screening result does not establish compliance or a violation.")
                 
                 # Extract and show only active triggers
-                st.markdown('<p style="font-weight: 600; font-size: 1.05rem; margin-bottom: 6px; font-family: \'Outfit\', sans-serif;">🔍 Active Signals Detected</p>', unsafe_allow_html=True)
+                st.markdown('<p style="font-weight: 600; font-size: 1.05rem; margin-bottom: 6px; font-family: \'Outfit\', sans-serif;">🔍 Lexical Signals</p>', unsafe_allow_html=True)
                 triggers = []
                 if feats.get("urgency_kw_count", 0) > 0:
                     triggers.append(("urgency", f"🚨 Urgency keywords ({feats['urgency_kw_count']})"))
@@ -426,13 +437,13 @@ def main():
                 if triggers:
                     badge_html = '<div style="margin: -6px 0 16px 0;">'
                     for tag, text_val in triggers:
-                        is_violation = tag in ["urgency", "scarcity", "shame", "cancel", "social", "price", "neg"]
-                        badge_class = "trigger-badge highlight" if is_violation else "trigger-badge"
+                        is_risk_signal = tag in ["urgency", "scarcity", "shame", "cancel", "social", "price", "neg"]
+                        badge_class = "trigger-badge highlight" if is_risk_signal else "trigger-badge"
                         badge_html += f'<span class="{badge_class}">{text_val}</span>'
                     badge_html += '</div>'
                     st.markdown(badge_html, unsafe_allow_html=True)
                 else:
-                    st.markdown('<div style="margin-bottom: 16px;"><span class="trigger-badge safe-signal">🌿 No suspicious signals detected</span></div>', unsafe_allow_html=True)
+                    st.markdown('<div style="margin-bottom: 16px;"><span class="trigger-badge safe-signal">🌿 No listed lexical signals fired</span></div>', unsafe_allow_html=True)
                     
                 with st.expander("🔬 View raw feature values"):
                     st.json({k: feats[k] for k in F.NUM_COLS})
@@ -443,7 +454,7 @@ def main():
                     <div style="font-size: 2.8rem; margin-bottom: 14px;">🔍</div>
                     <div style="font-size: 1.1rem; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">Awaiting Audit Input</div>
                     <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.45; max-width: 280px; margin: 0 auto;">
-                        Enter website UI copy on the left and click <strong>Analyze Copy</strong> to view the CCPA compliance results.
+                        Enter website UI copy on the left and click <strong>Analyze Copy</strong> to view the risk-screening result.
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -452,11 +463,11 @@ def main():
         st.markdown("""
         ### About the CCPA Dark Pattern Detector
         
-        This project is a compliance auditing tool built in alignment with **India's Consumer Protection (Prevention and Regulation of Dark Patterns) Guidelines, 2023** (referred to here as CCPA Compliance).
+        This project is a research risk screener organized around the categories in **India's Consumer Protection (Prevention and Regulation of Dark Patterns) Guidelines, 2023**.
         
         #### Key Objectives
         - **Promote User Autonomy**: Identify interface copy designed to trick, coerce, or manipulate consumers.
-        - **Ensure Regulatory Compliance**: Check if website copy violates the CCPA guidelines.
+        - **Support Human Review**: Surface possible textual signals without making a legal determination.
         - **Machine Learning Powered Audit**: Uses a compact classical text classifier to analyze snippets.
         
         #### Technical Architecture
@@ -466,12 +477,12 @@ def main():
         4. **Grouped calibration**: Produces probabilities without mixing page/template groups.
         5. **Direct output**: Shows the calibrated winning-class probability without a fallback threshold.
         
-        #### The 13 CCPA Dark-Pattern Clauses
+        #### The 13 CCPA Dark-Pattern Categories
         """)
         
-        for k, v in CCPA_CLAUSES.items():
+        for k, (description, context) in PATTERN_GUIDANCE.items():
             if k != "Not a Dark Pattern":
-                st.markdown(f"- **{k}**: {v}")
+                st.markdown(f"- **{DISPLAY_LABELS.get(k, k)}**: {description} *Context needed: {context}*")
                 
         st.markdown("""
         ---
@@ -481,7 +492,7 @@ def main():
         - **Repository Link**: [GitHub Profile](https://github.com/goyashek)
         
         #### ⚠️ Disclaimer
-        *This is a test/research project and does not constitute formal legal advice. UX designers and compliance officers should verify design systems with qualified legal experts.*
+        *This text-only research screener does not establish compliance or a legal violation. Review the complete interface and user flow with qualified domain and legal experts.*
         """)
 
 
