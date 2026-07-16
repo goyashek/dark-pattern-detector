@@ -14,8 +14,9 @@ __pycache__/
 data/raw/screenshots/
 data/raw/scraped_candidates.csv
 
-# Regenerated reports (held until model work settles)
-reports/
+# Keep the saved metrics needed by Notebook 2; ignore other regenerated reports.
+reports/*
+!reports/metrics_summary.json
 
 # Large fine-tuned transformer artifact — exceeds GitHub's 100MB limit.
 # Host on Hugging Face Hub (or Git-LFS); keep out of normal git.
