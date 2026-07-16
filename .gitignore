@@ -1,25 +1,6 @@
-# OS / editor junk
 .DS_Store
-
-# Python
 __pycache__/
-*.pyc
-
-# Local planning/docs — only README.md is tracked
-*.md
-!README.md
-
-# Scrape tooling & local-only artifacts
-.playwright-mcp
-data/raw/screenshots/
-data/raw/scraped_candidates.csv
-
-# Keep the saved metrics needed by Notebook 2; ignore other regenerated reports.
-reports/*
-!reports/metrics_summary.json
-
-# Large fine-tuned transformer artifact — exceeds GitHub's 100MB limit.
-# Host on Hugging Face Hub (or Git-LFS); keep out of normal git.
-models/distilbert_darkpattern/
-/.baseline_4391
-colab/model.safetensors
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+/tmp/

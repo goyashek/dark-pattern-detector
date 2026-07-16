@@ -1,6 +1,6 @@
 """Measure template leakage and create the saved page/template grouped split.
 
-Generated rows can share a sentence skeleton even when their brands or prices differ.
+Rows can share a sentence skeleton even when their brands or prices differ.
 This script compares a random split with grouped splitting, runs a few simple probes,
 and writes ``reports/leak_audit.json`` plus ``reports/leak_free_split.json``.
 
@@ -28,10 +28,8 @@ from xgboost import XGBClassifier
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 
-# Slot vocabularies — imported from the generator so the skeleton mask matches exactly
-# what was filled in. Keeping this as an import (not a copy) means the audit stays correct
-# if the pools ever change.
-from src.collect_data import (
+# These slot values help the leak audit recover shared sentence skeletons.
+from src.template_slots import (
     ADDONS, BRANDS, CATEGORIES, DURATIONS, FEES, FILE_TYPES, PRODUCTS, SOFTWARE,
 )
 from src.features import NUM_COLS
@@ -72,8 +70,8 @@ _WS_RE = re.compile(r"\s+")
 
 def skeleton(text: str) -> str:
     """Collapse a row to its template skeleton: mask currency, percentages, numbers,
-    and all known slot vocab, then normalise whitespace/case. Two rows generated from
-    the same template (differing only by filled slots) yield the SAME skeleton."""
+    and all known slot vocab, then normalise whitespace/case. Two rows with the same
+    phrasing (differing only by slot values) yield the SAME skeleton."""
     s = str(text)
     s = _CUR_RE.sub("<CUR>", s)
     s = _PCT_RE.sub("<PCT>", s)
@@ -84,7 +82,7 @@ def skeleton(text: str) -> str:
 
 
 def connected_groups(df: pd.DataFrame) -> np.ndarray:
-    """Group rows transitively by either source page or generated-text skeleton."""
+    """Group rows transitively by either source page or shared text skeleton."""
     parent = list(range(len(df)))
 
     def find(i):

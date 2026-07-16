@@ -9,13 +9,13 @@
   </a>
 </p>
 
-I built this project to test how well text models can screen short interface copy for possible dark-pattern wording. The label space contains the 13 categories named in India's 2023 CCPA dark-pattern guidelines plus a `Not a Dark Pattern` class.
+This project explores whether short interface text can be classified into the 13 dark-pattern categories described in India's 2023 CCPA guidelines. It also includes a `Not a Dark Pattern` class for benign text.
 
-The model only sees text. It cannot inspect layout, defaults, repeated prompts, cart changes, or a full signup and cancellation flow. Its output is a screening result, not a legal finding.
+The models only read text. They cannot inspect layout, default selections, repeated prompts, cart changes, or a complete signup or cancellation flow. Their output is a screening result, not a legal or compliance finding.
 
 ## Results
 
-All three models use the same 5,051/1,322 grouped train and test split. Rows stay together when they share a source page or a generated text template.
+All three models use the same grouped split of 5,051 training rows and 1,322 test rows. Rows that share a source page or normalized text pattern remain on the same side of the split.
 
 | Model | Test macro-F1 | Test accuracy | OOD-dev macro-F1 | OOD-dev accuracy | Size |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -23,139 +23,138 @@ All three models use the same 5,051/1,322 grouped train and test split. Rows sta
 | Character TF-IDF + 12 features + SMOTE + calibrated LinearSVC | 0.730 | 0.816 | **0.752** | **0.893** | ~4.4 MB |
 | LSTM (from scratch) | 0.657 | 0.784 | n/a | n/a | ~5 MB |
 
-The test columns come from Notebook 3. The OOD columns come from the saved classical and DistilBERT deployment artifacts, so I did not retrain either model for that refresh. At the provisional 50% DistilBERT display threshold, 27 of 28 OOD rows are covered and 24 of those 27 predictions are correct.
+DistilBERT performs best on the grouped test set, while the smaller classical model records the strongest results on the OOD-development set. The LSTM remains a useful from-scratch neural baseline but falls behind both approaches.
 
-The OOD file is development data, not a final test set. It has only 28 Indian UI strings across 9 classes, contains no benign rows, and influenced later model decisions.
+The OOD-development set contains 28 manually collected Indian UI strings across 9 classes. It has no benign examples and influenced later model decisions, so it is diagnostic rather than an independent final test set.
+
+At the provisional 50% DistilBERT display threshold, the model covers 27 of the 28 rows and correctly classifies 24 of those 27.
 
 ## Data and labels
 
-The final table has 6,373 unique strings across 14 classes:
+The source tables used in this project were obtained from the [Dark Patterns User Interfaces dataset on Kaggle](https://www.kaggle.com/datasets/dhamur/dark-patterns-user-interfaces). The base corpus comes from Yada et al.'s paper, [Dark patterns in e-commerce: a dataset and its baseline evaluations](https://arxiv.org/abs/2211.06543).
 
-- 2,157 rows were retained from the academic source after label mapping and deduplication.
-- 4,216 rows were generated from the templates in `src/collect_data.py` to fill missing or small classes.
-- Generated rows are useful for training experiments, but they are not legal ground truth.
+After label mapping, cleaning, and deduplication, the final dataset contains 6,373 unique text strings across 14 classes:
 
-The academic source taxonomy does not match the CCPA categories directly. I kept the project's existing mapping so the saved models and results remain reproducible, but the mapping is based on my own reading of the guidelines. It is not official or CCPA-approved. Several categories also require visual or flow evidence that an isolated sentence cannot provide.
+- 2,157 rows retained from the Yada et al. base corpus
+- 4,216 rows retained from the supplementary table
 
-`data/raw/pattern_label.csv` is an older copy of the generated pool and remains in the repository for audit history. The current script and Notebook 1 use `data/processed/collected.tsv`.
+The Yada et al. base corpus uses a different taxonomy, so I mapped its labels into the 13 CCPA categories used by this project, plus `Not a Dark Pattern`. The supplementary table already uses this 14-class label space. The mapping reflects my interpretation of the guidelines and has not been approved by the CCPA or reviewed by a legal domain expert.
 
-## The leakage problem I found
+Before splitting the data, I removed invalid rows and normalized duplicate text.
 
-My first random split produced about 0.96 macro-F1. That looked too good, so I checked the generated strings more closely. Many rows used the same sentence template with only a brand, product, price, or number changed. In the random split, 64.8% of test rows had a template sibling in training.
+## Train-test leakage audit
 
-The current split connects rows when they share either:
+My initial random split reached a macro-F1 of about 0.96. This appeared overly optimistic, so I examined the relationship between rows on both sides of the split.
 
-- the same source `page_id`, or
-- the same normalized template skeleton.
+Although exact duplicates had been removed, many rows still contained closely related wording. The audit found that 64.8% of test rows in the random split shared a normalized text pattern with a training row.
 
-Each connected group stays entirely in train or test. The split file also stores a dataset hash, so it fails if the saved row order or data changes.
+I replaced the random split with connected grouping based on source `page_id` and normalized text patterns. Each connected group remains entirely within either training or test.
 
-## Models I tried
+## Models
 
 ### Classical model
 
-The deployed Streamlit model combines character 2 to 6 gram TF-IDF with 12 small text features. I compare three LinearSVC values using grouped cross-validation, then calibrate the selected model with grouped sigmoid folds.
+The Streamlit app uses a compact classical pipeline built from character 2-6 gram TF-IDF, 12 focused text features, SMOTE within the training folds, and a LinearSVC classifier. I compare three LinearSVC settings using grouped cross-validation and apply grouped sigmoid calibration to the selected model.
 
-The 12 features are:
+The features cover urgency and scarcity terms, confirm-shaming and cancellation wording, social proof, pricing, discounts, negative options, punctuation, numbers, and time references.
 
-- urgency and scarcity words
-- confirm-shaming and cancellation wording
-- social-proof, price, discount, and negative-option wording
-- exclamation marks, question marks, numbers, and time references
-
-The app shows these hand-built signals separately from the model prediction. They are useful clues, not an explanation of the full classifier.
+The app displays these signals alongside the model prediction. They are diagnostic cues, not an exact explanation of how the classifier reached its decision.
 
 ### LSTM
 
-I trained a small LSTM from scratch as a neural baseline. It had to learn its vocabulary from roughly 5,000 training rows and reached 0.657 macro-F1. That was below the classical model.
+For a neural baseline, I trained a small LSTM from scratch on the same grouped training partition. It learned its vocabulary from roughly 5,000 training rows and reached 0.657 macro-F1 on the test set, below the classical model and DistilBERT.
 
 ### DistilBERT
 
-I fine-tuned DistilBERT on the same grouped split. It reached the best test macro-F1 at 0.883, but it is much larger and its softmax scores are not calibrated confidence. The Hugging Face demo reports a top score below 50% as inconclusive instead of changing it to benign.
+I fine-tuned DistilBERT on the same grouped training partition. It achieved the strongest grouped-test result, with 0.883 macro-F1 and 0.911 accuracy.
+
+The model is considerably larger than the classical pipeline, and its softmax scores are not calibrated confidence values. The Hugging Face demo reports a top score below the provisional 50% display threshold as inconclusive.
 
 ## Classical model checks
 
-I reran the older classical ideas on the grouped training folds. This table is a training-only ablation, not another final-test comparison.
+I used the grouped training folds to check whether the engineered features, SMOTE, and older word-level pipelines improved the classical model. The final test set was not used for this comparison.
 
 | Training-only variant | Grouped CV macro-F1 |
 | :--- | :---: |
-| Character TF-IDF + class-weighted LinearSVC | **0.776 +/- 0.030** |
-| Character TF-IDF + 12 engineered features | 0.739 +/- 0.046 |
-| Character TF-IDF + engineered features + SMOTE | 0.739 +/- 0.050 |
-| Deployed: character TF-IDF + 12 features + SMOTE | **0.739 +/- 0.059** |
-| Legacy word TF-IDF + engineered features + SMOTE + SVC | 0.555 +/- 0.034 |
-| Legacy word TF-IDF + engineered features + SMOTE + XGBoost | 0.559 +/- 0.034 |
+| Character TF-IDF + class-weighted LinearSVC | **0.776 ± 0.030** |
+| Character TF-IDF + 12 engineered features | 0.739 ± 0.046 |
+| Character TF-IDF + engineered features + SMOTE | 0.739 ± 0.050 |
+| Deployed: character TF-IDF + 12 features + SMOTE | **0.739 ± 0.059** |
+| Legacy word TF-IDF + engineered features + SMOTE + SVC | 0.555 ± 0.034 |
+| Legacy word TF-IDF + engineered features + SMOTE + XGBoost | 0.559 ± 0.034 |
 
-The engineered-feature model initially reached LinearSVC's iteration limit. Raising the limit to 5,000 converged at the same 0.739 score. A small grouped XGBoost search produced 0.566, 0.576, and 0.549 across three trials, so I stopped there and kept the simpler linear model.
+The results favored character TF-IDF with LinearSVC over the older word-level pipelines. The simpler class-weighted variant produced the highest cross-validation mean, while the engineered features and SMOTE remained close to 0.739.
 
-## Notebook order
+Although the class-weighted text-only variant achieved the highest cross-validation mean, the 12-feature pipeline remains the deployed model because it is reproduced consistently across both modeling notebooks, the exported artifact, and the Streamlit app. It also preserves one preprocessing and calibration workflow from training through inference.
 
-1. `01_data_nlp_eda.ipynb` loads both prepared sources, maps labels, removes duplicate text, explores class balance and text length, and writes the 12-feature table.
-2. `02_model_tuning_export.ipynb` checks the saved grouped split, compares the three LinearSVC settings, calibrates the selected model, and exports the classical artifact.
-3. `03_deep_learning_transformer.ipynb` compares the classical model with an LSTM and DistilBERT, then evaluates the saved deployment artifacts on the OOD development rows.
+The convergence warning disappeared after raising the LinearSVC iteration limit to 5,000, but the score stayed the same. Three XGBoost trials scored between 0.549 and 0.576, so I stopped the search.
 
-The notebooks keep their saved outputs. Notebook 2 defaults to `RUN_TRAINING=False`, so opening or executing the light cells does not replace the model. Notebook 3 can download the exact saved DistilBERT revision from Hugging Face when the local weight folder is absent.
+## Notebook workflow
+
+The project is organized as a three-notebook experiment.
+
+1. Notebook 1 prepares the data, applies the project label mapping, removes duplicate text, performs EDA, and writes the shared 12-feature table.
+2. Notebook 2 runs the grouped classical-model comparison, calibrates the selected LinearSVC pipeline, and exports the artifact used by Streamlit.
+3. Notebook 3 trains the LSTM and DistilBERT models on the same split and compares them with the classical pipeline on the grouped test and OOD-development data.
+
+Saved outputs are included for review. Classical retraining is disabled by default in Notebook 2, while the full DistilBERT training workflow is intended for Colab.
 
 ## Pipeline
 
 ```mermaid
 flowchart LR
-    A["Academic source"] --> B["Label mapping"]
-    C["Generated training rows"] --> D["Merge and deduplicate"]
+    A["Yada et al.<br/>base corpus"] --> B["Map base labels"]
+    C["Kaggle<br/>supplementary table"] --> D["Combined data"]
     B --> D
-    D --> E["Page and template grouped split"]
-    E --> F["Classical model"]
-    E --> G["LSTM"]
-    E --> H["DistilBERT"]
-    F --> I["Grouped test and OOD development check"]
-    G --> I
-    H --> I
-    F --> J["Streamlit app"]
-    H --> K["Hugging Face Space"]
+    D --> E["Clean + deduplicate<br/>14 classes + 12 features"]
+    E --> F["Grouped split"]
+
+    F --> G["Classical"]
+    F --> H["LSTM"]
+    F --> I["DistilBERT"]
+
+    G --> J["Calibrate + export"] --> K["Streamlit app"]
+    I --> L["Save model"] --> M["Hugging Face Space"]
+
+    G --> N["Evaluation<br/>Grouped test: all three<br/>OOD dev: Classical + DistilBERT"]
+    H --> N
+    I --> N
 ```
 
 ## Project structure
 
 ```text
-dark-pattern-detector/
-├── app/app.py                         # classical Streamlit app
-├── hf_space/                          # DistilBERT Gradio app and requirements
+.
 ├── notebooks/
 │   ├── 01_data_nlp_eda.ipynb
 │   ├── 02_model_tuning_export.ipynb
 │   └── 03_deep_learning_transformer.ipynb
 ├── src/
-│   ├── build_dataset.py
-│   ├── collect_data.py
 │   ├── features.py
-│   ├── make_features.py
-│   ├── make_ood_features.py
 │   ├── leak_audit.py
+│   ├── make_features.py
 │   └── train.py
+├── app/app.py
+├── hf_space/app.py
 ├── data/
-│   ├── raw/                           # source data and retained screenshots
-│   └── processed/                     # model-ready tables and OOD development data
-├── models/
-│   ├── best_multi_model.joblib
-│   └── label_encoder.joblib
-├── reports/
-│   ├── leak_audit.json
-│   ├── leak_free_split.json
-│   └── metrics_summary.json
-└── tests/                              # grouping, feature-contract and HF display checks
+│   ├── raw/
+│   └── processed/
+├── models/          # exported classical pipeline
+├── reports/         # metrics and leakage-audit outputs
+└── tests/
 ```
 
-The DistilBERT weights are about 269 MB, so they live in a separate Hugging Face model repository rather than normal Git history.
+The DistilBERT weights are hosted separately on Hugging Face rather than stored in the repository.
 
 ## Running the project
 
-Install the classical project dependencies:
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run the checks:
+Run the tests:
 
 ```bash
 python -m unittest discover -s tests -v
@@ -167,25 +166,26 @@ Launch the classical app:
 streamlit run app/app.py
 ```
 
-Notebook 3 is intended for Colab when training DistilBERT. Its setup cell installs the transformer package, and the expensive outputs are already saved in the notebook for inspection.
+DistilBERT training is handled in Notebook 3 and is intended to run in Colab. The trained outputs are saved in the notebook for review.
 
 ## Live demos
 
-- [Classical Streamlit app](https://dark-patterns.streamlit.app/)
-- [DistilBERT Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern)
+- [Classical model: Streamlit](https://dark-patterns.streamlit.app/)
+- [DistilBERT: Hugging Face Space](https://huggingface.co/spaces/goyashek/distilbert-darkpattern)
 
 ## Limitations
 
-- Most training rows are generated from fixed templates.
-- The academic-to-CCPA mapping has not been approved by a domain reviewer.
-- The OOD development file is small, incomplete, and not independent.
-- A text-only model cannot establish whether an interface complies with the guidelines.
-- The 50% DistilBERT abstention boundary is a display rule, not a calibrated operating threshold.
+- The mapping from the source labels to the CCPA categories is a project-level interpretation, not an official or legally reviewed taxonomy.
+- Although related rows are kept together through grouped splitting, the test data still comes from the same underlying source dataset.
+- The OOD-development set is small and incomplete: it contains 28 examples across 9 classes, no benign examples, and was used during model development.
+- The models classify isolated text and cannot evaluate layout, defaults, cart behavior, repeated prompts, or complete interaction flows.
+- DistilBERT's softmax scores are not calibrated confidence values. The 50% boundary is used only to control how predictions are displayed.
 
 ## Author
 
-[Abhishek Goyal](https://goyashek.github.io) | [GitHub](https://github.com/goyashek)
+**Abhishek Goyal**<br>
+[Portfolio](https://goyashek.github.io) · [GitHub](https://github.com/goyashek)
 
 ## Disclaimer
 
-This is a student project. The category mapping reflects my own reading of the CCPA dark-pattern guidelines. It is not official or approved by the CCPA, and the results should not be used as legal or compliance advice.
+This project is intended for educational use only. Its category mapping is based on my reading of the CCPA dark-pattern guidelines and has not been officially approved or legally reviewed. The results do not constitute legal or compliance advice.

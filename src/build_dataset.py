@@ -1,4 +1,4 @@
-"""Map the academic labels, merge generated rows, and build the final dataset.
+"""Map and merge the Kaggle source tables into the final dataset.
 
 The script removes normalized duplicate text before writing
 ``data/processed/ccpa_dataset.tsv``.
