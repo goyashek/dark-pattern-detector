@@ -1,36 +1,10 @@
-"""
-leak_audit.py — Template-sibling leak audit + template-aware honest split.
+"""Measure template leakage and create the saved page/template grouped split.
 
-WHY THIS EXISTS
----------------
-The training pool is heavily templated: each row is a fixed sentence skeleton with a
-few slots (brand, product, price, fee...) filled in. A plain random train/test split
-can put one sibling of a template in train and another sibling of the SAME template in
-test. The two strings differ only by a brand or a price, so any model effectively sees
-the test answer at fit time — the reported macro-F1 is inflated.
+Generated rows can share a sentence skeleton even when their brands or prices differ.
+This script compares a random split with grouped splitting, runs a few simple probes,
+and writes ``reports/leak_audit.json`` plus ``reports/leak_free_split.json``.
 
-This script:
-  1. Reconstructs each row's TEMPLATE SKELETON by masking every generator slot value
-     (currency, numbers, and the exact brand/product/fee/etc. vocab from collect_data.py),
-     then clusters rows by identical skeleton.
-  2. Quantifies leakage in the naive split NB2 uses
-     (train_test_split, test_size=0.2, stratify=y, random_state=42): how many skeleton
-     clusters straddle train and test, and how many test rows have a template twin in train.
-  3. Builds a SOURCE-AWARE split. Rows are connected when they share either a template
-     skeleton or page_id, then StratifiedGroupKFold keeps each connected component intact.
-  4. Trains the legacy notebook-2 pipelines on both splits to retain the original leakage
-     comparison. The current character-SVC evaluation lives in src/train.py.
-  5. Runs trivial single-signal probes (has-currency-symbol, text-length, keyword-only)
-     to check whether a lone confound can predict the class.
-
-Outputs (under reports/):
-  - leak_audit.json        full report (counts, cluster stats, naive-vs-leak-free F1, probes)
-  - leak_free_split.json   row-index lists {train, test} for the template-aware split
-
-Exit code is NON-ZERO if the leak-free split is not actually clean (a template still
-straddles the two sides) — so this can gate downstream training.
-
-Run:  python -m src.leak_audit
+Run: ``python -m src.leak_audit``
 """
 
 import hashlib
@@ -67,9 +41,8 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEATURES = os.path.join(HERE, "data", "processed", "features.csv")
 REPORTS = os.path.join(HERE, "reports")
 
-# Tuned hyperparameters lifted straight from notebook 2's Optuna study (the params that
-# produced the deployed joblib models), so the inflation figure is for the REAL deployed
-# model, not a proxy.
+# Hyperparameters from Notebook 2's saved Optuna study. Using the same values keeps the
+# random-split comparison tied to that older model rather than a new proxy.
 XGB_BEST = dict(n_estimators=105, max_depth=9, learning_rate=0.20396887264773383,
                 subsample=0.7637017332034828, colsample_bytree=0.7545474901621302)
 SVC_BEST = dict(C=2.124280213720889, loss="squared_hinge")

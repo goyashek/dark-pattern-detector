@@ -1,10 +1,6 @@
-"""
-make_features.py — Apply the shared feature extractor to the assembled dataset.
+"""Build ``features.csv`` from the processed dataset and shared feature functions.
 
-Reads  data/processed/ccpa_dataset.tsv
-Writes data/processed/features.csv  (text + clean_text + 12 numeric features + labels)
-
-Run:  python -m src.make_features
+Run: ``python -m src.make_features``
 """
 
 import os

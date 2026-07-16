@@ -1,20 +1,9 @@
-"""
-build_dataset.py — Assemble the final CCPA-labelled dataset.
+"""Map the academic labels, merge generated rows, and build the final dataset.
 
-Pipeline:
-  1. Robustly load the raw Yada-2022 TSV (skip malformed rows).
-  2. Remap the 7 academic (Mathur) categories onto the 13 CCPA categories + benign.
-  3. Merge in the manually-collected example rows from collect_data.py.
-  4. Global de-duplication on a normalised form of the text  <-- the leakage fix.
-  5. Drop empty / degenerate rows.
-  6. Write data/processed/ccpa_dataset.tsv.
+The script removes normalized duplicate text before writing
+``data/processed/ccpa_dataset.tsv``.
 
-Why global dedup matters: if the exact same string exists twice and we later do a
-train/test split, one copy can land in train and the other in test. The model then
-"recognises" the test example -> inflated score. Removing duplicates BEFORE any split
-guarantees every test string is genuinely unseen.
-
-Run:  python -m src.build_dataset
+Run: ``python -m src.build_dataset``
 """
 
 import os

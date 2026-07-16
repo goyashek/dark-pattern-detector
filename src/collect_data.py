@@ -1,20 +1,10 @@
-"""
-collect_data.py — Assemble the manually-collected example pool.
+"""Generate supplementary training rows for classes missing from the academic source.
 
-WHY THIS EXISTS
----------------
-The Yada-2022 dataset is skewed toward "Not a Dark Pattern" and is missing several CCPA
-categories entirely (Nagging, SaaS Billing, Rogue Malware, Bait and Switch, Drip
-Pricing...). To cover those classes we manually collected UI-text examples from real
-e-commerce, SaaS and mobile apps.
+The rows come from fixed templates filled with brands, products, prices, and other slots.
+They are synthetic training data, not independently reviewed ground truth. The script
+writes ``data/processed/collected.tsv``.
 
-Because scraped strings carry specific brand, product and price names, we normalise those
-into placeholder tokens and record the natural wording variations of each collected
-pattern, keeping only UNIQUE strings. This avoids the classic mistake of repeating a
-handful of fixed sentences (which would let the same string land in both the train and
-test split -> data leakage -> optimistic scores).
-
-Run:  python -m src.collect_data        (writes data/processed/collected.tsv)
+Run: ``python -m src.collect_data``
 """
 
 import csv
@@ -29,11 +19,8 @@ BENIGN_TARGET = 700      # extra benign / "Not a Dark Pattern" rows
 # --------------------------------------------------------------------------- #
 # OOD contamination guard
 # --------------------------------------------------------------------------- #
-# data/processed/ood_real_test.csv is a HELD-OUT set of real Indian UI strings used as the
-# honest out-of-distribution test. When we add short synthetic fragments we want stylistic
-# SIBLINGS of those strings, never the strings themselves — otherwise the OOD score is
-# contaminated and any improvement is fake. This guard makes that impossible by construction:
-# any generated row that normalises to the same skeleton as an OOD row is rejected.
+# Keep generated rows from copying a normalized OOD development string. The OOD file is
+# not a final test set, but direct overlap would still make its diagnostic score misleading.
 
 
 def _ood_norm(s):

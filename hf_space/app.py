@@ -1,16 +1,7 @@
-"""
-Dark Pattern Detector — DistilBERT showcase (Hugging Face Space, Route 2).
+"""Gradio app for the fine-tuned DistilBERT model.
 
-Companion to the classical Streamlit app. That app is the fast, interpretable default
-(character TF-IDF + 12 engineered features -> calibrated LinearSVC, with signal badges). This Space
-serves the fine-tuned DistilBERT model, a black box that reads whole-phrase meaning instead
-of counting keywords.
-
-So the interpretability surface here is different *on purpose*. Instead of faking keyword
-badges the transformer doesn't use, we show its full softmax distribution across all 14
-classes. These softmax scores show what it considered, but are not calibrated confidence.
-
-Weights load from a separate HF Model repo (set MODEL_ID), so this Space stays light.
+The app shows the top softmax scores across 14 classes. These scores are not calibrated
+confidence. Model weights load from the Hugging Face repository set by ``MODEL_ID``.
 """
 
 import os
@@ -25,13 +16,10 @@ try:
 except ImportError:  # HF Spaces uploads this directory as the repository root.
     from presentation import ABSTAIN_THRESHOLD, BENIGN, result_status
 
-# Model repo holding the fine-tuned weights. Override via the MODEL_ID Space secret/variable
-# if your HF username/repo differs. A local directory also works (handy for local testing).
+# ``MODEL_ID`` can also point to a local directory for testing.
 MODEL_ID = os.environ.get("MODEL_ID", "goyashek/distilbert-darkpattern")
 
-# 14 classes in label-encoder order (alphabetical) — the index order the model's logits use.
-# Kept in sync with label_map.json saved alongside the weights; we still try to load that
-# file from the repo first, and fall back to this list.
+# The logits use this alphabetical label-encoder order.
 CLASSES = [
     "Bait and Switch", "Basket Sneaking", "Confirm Shaming", "Disguised Advertisement",
     "Drip Pricing", "False Urgency", "Forced Action", "Interface Interference",
@@ -153,14 +141,13 @@ CUSTOM_CSS = """
 #verdict {min-height: 130px;}
 """
 
-with gr.Blocks(title="Dark Pattern Detector — DistilBERT", theme=gr.themes.Soft(),
+with gr.Blocks(title="Dark Pattern Detector: DistilBERT", theme=gr.themes.Soft(),
                css=CUSTOM_CSS) as demo:
     gr.Markdown(
-        "# 🔍 Dark Pattern Detector — DistilBERT\n"
-        "Research risk screener trained against the 13 categories named in **India's CCPA "
-        "Dark Pattern Guidelines, 2023**, plus a no-dark-pattern class. This is the "
-        "higher-accuracy companion to the classical Streamlit app — it reads whole-phrase "
-        "meaning rather than counting keywords."
+        "# 🔍 Dark Pattern Detector: DistilBERT\n"
+        "I fine-tuned this model to screen UI text across the 13 categories named in "
+        "India's 2023 CCPA dark-pattern guidelines, plus a no-dark-pattern class. "
+        "It is a text classifier, not a compliance check."
     )
 
     with gr.Row():
@@ -174,20 +161,16 @@ with gr.Blocks(title="Dark Pattern Detector — DistilBERT", theme=gr.themes.Sof
             gr.Examples(EXAMPLES, inputs=inp, label="Or try a sample")
         with gr.Column(scale=1):
             verdict = gr.Markdown(elem_id="verdict")
-            # gr.Label is the transformer's interpretability surface: the full softmax
-            # spread across all 14 classes, not a fabricated keyword breakdown.
             dist = gr.Label(num_top_classes=5, label="Model scores across classes")
 
     btn.click(analyze, inputs=inp, outputs=[dist, verdict])
     inp.submit(analyze, inputs=inp, outputs=[dist, verdict])
 
-    with gr.Accordion("Why no keyword badges here? (interpretability note)", open=False):
+    with gr.Accordion("Why there are no keyword signals", open=False):
         gr.Markdown(
-            "The **classical** model scores 12 hand-built signals (urgency words, hidden-fee "
-            "phrasing, cancellation friction…), so its app can show *which* features fired. "
-            "DistilBERT has no such features — it learns phrasing directly. Its honest "
-            "interpretability surface is the **softmax score distribution** above: what it "
-            "weighed, not calibrated confidence. Any top score below the provisional "
+            "The classical model uses 12 hand-built text signals, so its app can list the "
+            "signals that fired. DistilBERT does not use those features. I show its top "
+            "softmax scores instead, but they are not calibrated confidence. A top score below the provisional "
             f"{int(ABSTAIN_THRESHOLD*100)}% display threshold is shown as *inconclusive*, "
             "never converted to benign.\n\n"
             "*This is a student project. I mapped the dataset labels to the CCPA dark-pattern "
@@ -197,5 +180,5 @@ with gr.Blocks(title="Dark Pattern Detector — DistilBERT", theme=gr.themes.Sof
         )
 
 if __name__ == "__main__":
-    # HF Spaces runs in a container — bind to 0.0.0.0:7860, not localhost.
+    # HF Spaces expects the app on this host and port.
     demo.launch(server_name="0.0.0.0", server_port=7860)

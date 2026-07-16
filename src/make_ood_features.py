@@ -1,13 +1,6 @@
-"""make_ood_features.py — Precompute the 12 features for the OOD real-world test rows.
+"""Build ``ood_features.csv`` with the same 12 features used for training.
 
-Reads  data/processed/ood_real_test.csv   (raw real Indian UI strings + labels)
-Writes data/processed/ood_features.csv    (text + clean_text + 12 numeric features + labels)
-
-Uses the SAME shared extractor as training (src/features.py), so the classical model sees
-identical inputs on OOD as it did in training — no train-serve skew. This is done here (not
-in the notebook) so notebook 3 only ever *loads* files and never recomputes features.
-
-Run:  python -m src.make_ood_features
+Run: ``python -m src.make_ood_features``
 """
 
 import os

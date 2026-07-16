@@ -1,17 +1,4 @@
-"""
-features.py — Single source of truth for text preprocessing and NLP feature extraction.
-
-Both the training pipeline (src/make_features.py) and the Streamlit app (app/app.py)
-import from this module so that the features seen at inference time are *identical*
-to the ones the model was trained on. In the original project this logic was copied
-into three different files, which is a classic source of train/serve skew.
-
-Route 1 philosophy (classical NLP + core ML):
-    Short UI strings (5-15 words) do not benefit much from transformer attention.
-    What matters is whether words like "hurry" appear and a few punctuation/number
-    signals. We turn raw text into a fixed tabular feature vector
-    that classical scikit-learn models can consume and that humans can interpret.
-"""
+"""Text cleaning and the 12 features shared by training and the Streamlit app."""
 
 import re
 import nltk
@@ -30,16 +17,14 @@ def ensure_nltk(quiet=True):
         try:
             nltk.download(pkg, quiet=quiet)
         except Exception:
-            # Network unavailable / already present — fail soft.
+            # Feature extraction can still continue when the corpora are already cached.
             pass
 
 
 _LEMMATIZER = WordNetLemmatizer()
 
 # --------------------------------------------------------------------------- #
-# Keyword lexicons — the interpretable backbone of the classifier.
-# These are the *single* canonical definitions. Edit here and both training
-# and serving pick up the change.
+# Both feature generation and the app import these keyword lists.
 # --------------------------------------------------------------------------- #
 URGENCY_KW = [
     r"hurry", r"limited time", r"ends in", r"only.*hours", r"today only",

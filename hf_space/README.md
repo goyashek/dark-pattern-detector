@@ -9,38 +9,27 @@ python_version: "3.12"
 app_file: app.py
 pinned: false
 license: mit
-short_description: DistilBERT risk screening for potential dark-pattern text
+short_description: DistilBERT screening for possible dark-pattern text
 ---
 
-# Dark Pattern Detector — DistilBERT
+# Dark Pattern Detector: DistilBERT
 
-Fine-tuned DistilBERT research screener that maps UI copy onto the 13 categories named in
-**India's CCPA Dark Pattern Guidelines, 2023**, plus a no-dark-pattern class.
+This Space runs the DistilBERT model I fine-tuned for my dark-pattern text project. It predicts one of the 13 categories named in India's 2023 CCPA dark-pattern guidelines or the no-dark-pattern class.
 
-This Space is the higher-accuracy companion to a classical TF-IDF + engineered-feature
-model (served separately as a Streamlit app). The classical model is the fast, fully
-interpretable default; this transformer reads whole-phrase meaning and holds up better on
-real-world text, at the cost of size and explainability.
+The model only reads UI text. It cannot inspect visual hierarchy, default selections, repeated prompts, or a complete user flow.
 
-## Why no keyword badges?
+## Model scores
 
-The classical app highlights *which* hand-built signals fired (urgency words, hidden-fee
-phrasing, cancellation friction). DistilBERT has no such features — so its honest
-interpretability surface is the **full softmax score distribution across all 14 classes**,
-shown alongside each prediction. These scores are not calibrated confidence. Any top score
-below the provisional 50% display threshold is reported as *inconclusive* rather than being
-converted to benign.
+The classical version of this project has 12 explicit text features. DistilBERT does not use those features, so this app shows its top softmax scores instead. The scores are not calibrated confidence.
+
+A top score below the provisional 50% display threshold is reported as inconclusive. It is not changed to a benign prediction.
 
 ## Configuration
 
-- Runs on **CPU Basic** (free). Single-example inference is interactive (~tens of ms);
-  a GPU offers no perceptible benefit at this scale.
-- Weights load from a separate model repo via `MODEL_ID` (default
-  `goyashek/distilbert-darkpattern`). Override with a Space variable if your repo differs.
+The Space runs on CPU Basic. It loads weights from `goyashek/distilbert-darkpattern` by default. The `MODEL_ID` Space variable can point to a different repository or local folder.
 
 ## Disclaimer
 
-This is a student project. I mapped the dataset labels to the CCPA dark-pattern categories
-based on my own reading of the guidelines. The mapping is not official or approved by the
-CCPA, and the results should not be used as legal or compliance advice. Made by
-[Abhishek Goyal](https://github.com/goyashek).
+This is a student project. The category mapping reflects my own reading of the CCPA dark-pattern guidelines. It is not official or approved by the CCPA, and the results should not be used as legal or compliance advice.
+
+[Abhishek Goyal](https://github.com/goyashek)
