@@ -13,6 +13,13 @@ This project explores whether short interface text can be classified into the 13
 
 The models only read text. They cannot inspect layout, default selections, repeated prompts, cart changes, or a complete signup or cancellation flow. Their output is a screening result, not a legal or compliance finding.
 
+## Regulatory context and motivation
+
+> [!IMPORTANT]
+> On 30 November 2023, India's Central Consumer Protection Authority issued the [Guidelines for Prevention and Regulation of Dark Patterns, 2023](https://consumeraffairs.nic.in/sites/default/files/The%20Guidelines%20for%20Prevention%20and%20Regulation%20of%20Dark%20Patterns%2C%202023.pdf) under the Consumer Protection Act, 2019. The guidelines identify 13 specified dark patterns.
+>
+> This project uses those categories as an experimental label framework for screening short UI text. It does not automate compliance review or determine whether an interface violates the guidelines.
+
 ## Results
 
 All three models use the same grouped split of 5,051 training rows and 1,322 test rows. Rows that share a source page or normalized text pattern remain on the same side of the split.
@@ -58,6 +65,11 @@ The Streamlit app uses a compact classical pipeline built from character 2-6 gra
 
 The features cover urgency and scarcity terms, confirm-shaming and cancellation wording, social proof, pricing, discounts, negative options, punctuation, numbers, and time references.
 
+#### The 12 engineered NLP features
+
+- **Lexical and intent signals:** `urgency_kw_count`, `scarcity_kw_count`, `shame_phrase_flag`, `cancel_diff_score`, `social_proof_flag`, `price_drip_flag`, `discount_claim_flag`, and `neg_option_flag`
+- **Structural signals:** `exclamation_count`, `question_count`, `number_present`, and `time_reference_flag`
+
 The app displays these signals alongside the model prediction. They are diagnostic cues, not an exact explanation of how the classifier reached its decision.
 
 ### LSTM
@@ -88,6 +100,36 @@ The results favored character TF-IDF with LinearSVC over the older word-level pi
 Although the class-weighted text-only variant achieved the highest cross-validation mean, the 12-feature pipeline remains the deployed model because it is reproduced consistently across both modeling notebooks, the exported artifact, and the Streamlit app. It also preserves one preprocessing and calibration workflow from training through inference.
 
 The convergence warning disappeared after raising the LinearSVC iteration limit to 5,000, but the score stayed the same. Three XGBoost trials scored between 0.549 and 0.576, so I stopped the search.
+
+## Advanced techniques and rationale
+
+### 1. Global deduplication before splitting
+
+- **Why:** Removing normalized duplicate strings before the split prevents identical UI text from appearing in both the training and test sets.
+
+### 2. Connected source-aware grouping
+
+- **Why:** Rows linked by either source `page_id` or normalized text pattern stay in the same connected group. This keeps closely related wording on one side of the train-test split and grouped validation folds.
+
+### 3. SMOTE inside training folds
+
+- **Why:** SMOTE runs inside the classical training pipeline, so it resamples only the training portion of each fold and does not use validation examples.
+
+### 4. Robust scaling and Yeo-Johnson transformation
+
+- **Why:** The 12 numeric text features are scaled and transformed before SMOTE and classification to reduce the effect of skewed values and outliers.
+
+### 5. Grouped macro-F1 selection and sigmoid calibration
+
+- **Why:** LinearSVC settings are compared with grouped macro-F1, which gives each class equal weight. The selected model is then calibrated with grouped sigmoid folds to produce probabilities without mixing connected groups.
+
+### 6. Fixed training-inference feature contract
+
+- **Why:** Training and Streamlit use the same ordered set of 12 features. A regression test checks this contract so preprocessing changes do not silently alter inference.
+
+### 7. DistilBERT transfer learning with an inconclusive display rule
+
+- **Why:** Fine-tuning a pretrained language model provides a contextual comparison with the classical and from-scratch LSTM models. Because its softmax scores are not calibrated confidence values, predictions below the provisional 50% threshold are shown as inconclusive rather than changed to benign.
 
 ## Notebook workflow
 
