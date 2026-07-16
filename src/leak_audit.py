@@ -48,7 +48,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedGroupKFold, train_test_split
 from sklearn.metrics import f1_score
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler, PowerTransformer, RobustScaler
+from sklearn.preprocessing import LabelEncoder, PowerTransformer, RobustScaler
 from sklearn.svm import LinearSVC
 from xgboost import XGBClassifier
 from imblearn.over_sampling import SMOTE

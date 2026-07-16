@@ -131,10 +131,3 @@ def extract_features(text):
         "number_present":      int(bool(re.search(r"\d+", text))),
         "time_reference_flag": int(bool(re.search(r"hour|minute|day|tonight|today|soon|week|month|year", text_lower))),
     }
-
-
-def build_feature_row(text):
-    """Convenience: return {clean_text, **features} for a single string."""
-    row = {"clean_text": clean_and_lemmatize(text)}
-    row.update(extract_features(text))
-    return row
